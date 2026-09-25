@@ -20,6 +20,7 @@ import androidx.compose.material.icons.automirrored.filled.Logout
 import androidx.compose.material.icons.filled.Assessment
 import androidx.compose.material.icons.filled.DirectionsBoat
 import androidx.compose.material.icons.filled.Flight
+import androidx.compose.material.icons.filled.Insights
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -54,6 +55,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.kenisshop.logistica.R
 import com.kenisshop.logistica.data.TipoMercaderia
 import com.kenisshop.logistica.ui.theme.colorCabecera
+import com.kenisshop.logistica.ui.traker.TrakerScreen
 
 private const val PANEL_NINGUNO = -1L
 private const val PANEL_NUEVO = 0L
@@ -77,7 +79,7 @@ fun MainScreen(vm: MainViewModel) {
         return
     }
 
-    BackHandler(enabled = !esTablet && panel != PANEL_NINGUNO) { panel = PANEL_NINGUNO }
+    BackHandler(enabled = tab != 2 && !esTablet && panel != PANEL_NINGUNO) { panel = PANEL_NINGUNO }
 
     Scaffold(
         topBar = {
@@ -129,20 +131,18 @@ fun MainScreen(vm: MainViewModel) {
                         }
                     }
                 ) {
-                    Tab(
-                        selected = tab == 0,
-                        onClick = { if (tab != 0) { tab = 0; panel = PANEL_NINGUNO } },
-                        text = { Text("MERCADERÍA AÉREA", fontWeight = FontWeight.Bold, maxLines = 1) },
-                        icon = { Icon(Icons.Default.Flight, null) },
-                        unselectedContentColor = Color.White.copy(alpha = 0.65f)
-                    )
-                    Tab(
-                        selected = tab == 1,
-                        onClick = { if (tab != 1) { tab = 1; panel = PANEL_NINGUNO } },
-                        text = { Text("MERCADERÍA MARÍTIMA", fontWeight = FontWeight.Bold, maxLines = 1) },
-                        icon = { Icon(Icons.Default.DirectionsBoat, null) },
-                        unselectedContentColor = Color.White.copy(alpha = 0.65f)
-                    )
+                    val etiquetas = if (esTablet) listOf("MERCADERÍA AÉREA", "MERCADERÍA MARÍTIMA", "TRAKER")
+                    else listOf("AÉREA", "MARÍTIMA", "TRAKER")
+                    val iconos = listOf(Icons.Default.Flight, Icons.Default.DirectionsBoat, Icons.Default.Insights)
+                    etiquetas.forEachIndexed { i, texto ->
+                        Tab(
+                            selected = tab == i,
+                            onClick = { if (tab != i) { tab = i; panel = PANEL_NINGUNO } },
+                            text = { Text(texto, fontWeight = FontWeight.Bold, maxLines = 1) },
+                            icon = { Icon(iconos[i], null) },
+                            unselectedContentColor = Color.White.copy(alpha = 0.65f)
+                        )
+                    }
                 }
             }
         }
@@ -153,7 +153,9 @@ fun MainScreen(vm: MainViewModel) {
                 .fillMaxSize()
                 .background(MaterialTheme.colorScheme.background)
         ) {
-            if (esTablet) {
+            if (tab == 2) {
+                TrakerScreen()
+            } else if (esTablet) {
                 // Tablet: lista a la izquierda, detalle o formulario a la derecha
                 Row(Modifier.fillMaxSize()) {
                     ListaPedidos(

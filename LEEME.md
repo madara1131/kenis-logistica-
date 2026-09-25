@@ -54,3 +54,28 @@ la versión nueva se instala **encima** de la anterior **sin borrar los pedidos*
 - **Sin eliminación automática:** los pedidos nunca se borran.
 - **Reportes:** filtros por fecha, tipo, empresa y estado → exporta a **Excel (.xlsx)** o **PDF** y se comparte/guarda (WhatsApp, Drive, correo, Archivos…).
 - **Modo oscuro** automático según el sistema.
+
+---
+
+## Pestaña TRAKER (v1.1)
+
+Control de gastos que se alimenta de tu Excel **TRAKER DE GASTO**.
+
+1. Pestaña **TRAKER** → **Importar Excel** → elige el `.xlsx` → confirma el año → **Importar**.
+2. La app reconoce sola los bloques del Excel: cada mes con *Gastos personales*, *Kenisshop* y *Gastos necesarios*
+   (categoría, presupuesto, gasto real y capital), además de *Deudas*, *Gastos extras*, *Ahorros*, *Diezmo* y *Notas*.
+3. Desde ahí ya no se usa el Excel: todo se edita en la app.
+
+Vistas:
+- **Mes**: desliza a los lados para cambiar de mes. Resumen, tarjetas por sección con barras de avance,
+  capital y saldo (toca para editarlo), gráfico circular y barras. "Nuevo mes" copia los presupuestos del mes anterior.
+- **Registros**: búsqueda y filtros por mes, sección, categoría y estado (Sin gasto / Dentro / Cerca del límite / Excedido).
+- **Gráficos**: líneas por mes, presupuesto vs gasto, distribución por categoría y ahorros (toca para ver detalles).
+- **Listas**: deudas, gastos extras, ahorros, diezmo y notas.
+
+Tocar un registro = editar (con botón **Sumar** para agregar el gasto del día). Deslizar a la izquierda = eliminar.
+
+Notificaciones automáticas: al importar (qué cambió respecto a lo anterior) y cuando una categoría
+pasa el 90 % o supera su presupuesto, o una sección queda con saldo negativo.
+
+Los datos del Traker van en una base aparte (`traker.db`): los pedidos no se tocan.

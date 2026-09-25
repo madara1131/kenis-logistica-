@@ -19,6 +19,7 @@ import com.kenisshop.logistica.data.Pedido
 object Notificaciones {
     const val CANAL_ATRASO = "alertas_atraso"
     const val CANAL_RECORDATORIO = "recordatorio_diario"
+    const val CANAL_TRAKER = "traker_cambios"
     private const val ID_RECORDATORIO = 1
 
     fun crearCanales(context: Context) {
@@ -33,6 +34,31 @@ object Notificaciones {
                 description = "Pregunta diaria: ¿Se registró mercadería hoy?"
             }
         )
+        nm.createNotificationChannel(
+            NotificationChannel(CANAL_TRAKER, "Traker de gastos", NotificationManager.IMPORTANCE_DEFAULT).apply {
+                description = "Avisos del Traker: presupuestos excedidos, saldo negativo y cambios al importar el Excel"
+            }
+        )
+    }
+
+    /** Aviso del Traker. [id] distinto por tipo de aviso para que no se pisen entre sí. */
+    @SuppressLint("MissingPermission")
+    fun traker(context: Context, id: Int, titulo: String, lineas: List<String>, urgente: Boolean = false) {
+        if (!puedeNotificar(context)) return
+        val estilo = NotificationCompat.InboxStyle().setBigContentTitle(titulo)
+        lineas.take(7).forEach { estilo.addLine(it) }
+        if (lineas.size > 7) estilo.setSummaryText("y ${lineas.size - 7} más")
+        val n = NotificationCompat.Builder(context, CANAL_TRAKER)
+            .setSmallIcon(R.drawable.ic_notificacion)
+            .setColor(if (urgente) 0xFFD93B30.toInt() else 0xFFD9468F.toInt())
+            .setContentTitle(titulo)
+            .setContentText(lineas.firstOrNull() ?: "")
+            .setStyle(estilo)
+            .setPriority(if (urgente) NotificationCompat.PRIORITY_HIGH else NotificationCompat.PRIORITY_DEFAULT)
+            .setContentIntent(abrirApp(context))
+            .setAutoCancel(true)
+            .build()
+        NotificationManagerCompat.from(context).notify(id, n)
     }
 
     private fun abrirApp(context: Context): PendingIntent {
