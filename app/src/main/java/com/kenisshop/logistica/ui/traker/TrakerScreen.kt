@@ -88,6 +88,8 @@ import com.kenisshop.logistica.data.traker.TipoLista
 import com.kenisshop.logistica.data.traker.estado
 import com.kenisshop.logistica.data.traker.plan
 import com.kenisshop.logistica.data.traker.real
+import com.kenisshop.logistica.data.traker.ResumenTotales
+import com.kenisshop.logistica.data.traker.resumen
 import com.kenisshop.logistica.ui.ChipFiltro
 import com.kenisshop.logistica.ui.theme.AzulKenis
 import com.kenisshop.logistica.ui.theme.EstadoRojo
@@ -344,75 +346,59 @@ private fun PaginaMes(
     val esTablet = LocalConfiguration.current.screenWidthDp >= 600
     val cats = d.delMes(mes)
     val secciones = d.secciones(mes).ifEmpty { listOf(SeccionTraker.PERSONAL) }
-    val plan = cats.sumOf { it.plan }
-    val real = cats.sumOf { it.real }
-    val capital = secciones.mapNotNull { d.capital(mes, it) }.let { if (it.isEmpty()) null else it.sum() }
-    val excedidos = cats.count { it.estado() == EstadoGasto.EXCEDIDO }
     val faltantes = SeccionTraker.entries.filter { it !in secciones }
 
     val resumen: @Composable () -> Unit = {
-        Card(
-            shape = RoundedCornerShape(18.dp),
-            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer),
-            modifier = Modifier.fillMaxWidth()
-        ) {
-            Column(Modifier.padding(16.dp)) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(Icons.Default.CalendarMonth, null, tint = MaterialTheme.colorScheme.onPrimaryContainer)
-                    Spacer(Modifier.width(8.dp))
+        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            // Encabezado del mes
+            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(start = 4.dp)) {
+                Icon(Icons.Default.CalendarMonth, null, tint = MaterialTheme.colorScheme.primary)
+                Spacer(Modifier.width(8.dp))
+                Column(Modifier.weight(1f)) {
                     Text(
                         Meses.etiqueta(mes),
                         style = MaterialTheme.typography.titleLarge,
                         fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.onPrimaryContainer,
-                        modifier = Modifier.weight(1f)
+                        color = MaterialTheme.colorScheme.primary
                     )
-                    IconButton(onClick = onBorrarMes) {
-                        Icon(Icons.Default.DeleteSweep, "Eliminar mes", tint = MaterialTheme.colorScheme.onPrimaryContainer)
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(Icons.Default.SwipeLeft, null, Modifier.size(14.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Spacer(Modifier.width(4.dp))
+                        Text(
+                            "Desliza para cambiar de mes",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
                     }
                 }
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(Icons.Default.SwipeLeft, null, Modifier.size(14.dp), tint = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.6f))
-                    Spacer(Modifier.width(4.dp))
-                    Text(
-                        "Desliza para cambiar de mes",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.6f)
-                    )
-                }
-                Spacer(Modifier.height(12.dp))
-                Row {
-                    Totales("Presupuesto", Dinero.fmt(plan), MaterialTheme.colorScheme.onPrimaryContainer, Modifier.weight(1f))
-                    Totales("Gasto real", Dinero.fmt(real), MaterialTheme.colorScheme.onPrimaryContainer, Modifier.weight(1f))
-                    val disponible = (capital ?: plan) - real
-                    Totales(
-                        if (capital != null) "Saldo" else "Disponible",
-                        Dinero.fmt(disponible),
-                        if (disponible >= 0) EstadoVerde else EstadoRojo,
-                        Modifier.weight(1f)
-                    )
-                }
-                Spacer(Modifier.height(10.dp))
-                val frac = if (plan > 0) (real / plan).toFloat() else 0f
-                BarraProgreso(frac, if (frac > 1f) EstadoRojo else if (frac >= 0.9f) Color(0xFFF2C12E) else EstadoVerde)
-                Spacer(Modifier.height(4.dp))
-                Text(
-                    if (plan > 0) "Usado ${(real / plan * 100).toInt()}% del presupuesto" else "Sin presupuesto definido",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onPrimaryContainer
-                )
-                if (excedidos > 0) {
-                    Spacer(Modifier.height(10.dp))
-                    Row(
-                        Modifier.fillMaxWidth().clip(RoundedCornerShape(10.dp)).background(EstadoRojo).padding(10.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Icon(Icons.Default.Warning, null, tint = Color.White)
-                        Spacer(Modifier.width(8.dp))
-                        Text("$excedidos categoría(s) pasaron su presupuesto", color = Color.White, fontWeight = FontWeight.SemiBold)
-                    }
+                IconButton(onClick = onBorrarMes) {
+                    Icon(Icons.Default.DeleteSweep, "Eliminar mes", tint = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }
+            // Resumen de gastos personales (solo personales)
+            ResumenGrupo(
+                titulo = "👤 Gastos personales",
+                subtitulo = "Gastos propios",
+                r = d.resumen(mes, SeccionTraker.PERSONAL),
+                fondo = MaterialTheme.colorScheme.primaryContainer,
+                texto = MaterialTheme.colorScheme.onPrimaryContainer
+            )
+            // Resumen de gastos necesarios (aparte)
+            ResumenGrupo(
+                titulo = "🧾 Gastos necesarios",
+                subtitulo = "Supermercado, suscripciones, tarjetas…",
+                r = d.resumen(mes, SeccionTraker.NECESARIOS),
+                fondo = Color(0xFFF2A12E).copy(alpha = 0.16f),
+                texto = MaterialTheme.colorScheme.onSurface
+            )
+            // Resumen de Kenisshop
+            ResumenGrupo(
+                titulo = "🛍️ Kenisshop",
+                subtitulo = "Gastos del negocio",
+                r = d.resumen(mes, SeccionTraker.KENISSHOP),
+                fondo = RosaKenis.copy(alpha = 0.14f),
+                texto = MaterialTheme.colorScheme.onSurface
+            )
         }
     }
 
@@ -873,4 +859,75 @@ private fun DialogoImportacion(v: TrakerViewModel.VistaPrevia, datosActuales: Da
         },
         dismissButton = { TextButton(onClick = { vm.cancelarImportacion() }) { Text("Cancelar") } }
     )
+}
+
+/** Tarjeta de resumen de un grupo de gastos (propios o Kenisshop), cada uno con sus propios totales. */
+@Composable
+private fun ResumenGrupo(
+    titulo: String,
+    subtitulo: String,
+    r: ResumenTotales,
+    fondo: Color,
+    texto: Color
+) {
+    val plan = r.presupuesto
+    val real = r.gastoReal
+    val capital = r.capital
+    val excedidos = r.excedidos
+    val disponible = r.disponible
+    Card(
+        shape = RoundedCornerShape(18.dp),
+        colors = CardDefaults.cardColors(containerColor = fondo),
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Column(Modifier.padding(16.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Column(Modifier.weight(1f)) {
+                    Text(titulo, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = texto)
+                    Text(subtitulo, style = MaterialTheme.typography.labelSmall, color = texto.copy(alpha = 0.7f))
+                }
+                if (capital != null) {
+                    Column(horizontalAlignment = Alignment.End) {
+                        Text("Capital", style = MaterialTheme.typography.labelSmall, color = texto.copy(alpha = 0.7f))
+                        Text(Dinero.fmt(capital), fontWeight = FontWeight.Bold, color = texto)
+                    }
+                }
+            }
+            Spacer(Modifier.height(12.dp))
+            Row {
+                Totales("Presupuesto", Dinero.fmt(plan), texto, Modifier.weight(1f))
+                Totales("Gasto real", Dinero.fmt(real), texto, Modifier.weight(1f))
+                Totales(
+                    if (capital != null) "Saldo" else "Disponible",
+                    Dinero.fmt(disponible),
+                    if (disponible >= 0) EstadoVerde else EstadoRojo,
+                    Modifier.weight(1f)
+                )
+            }
+            Spacer(Modifier.height(10.dp))
+            val frac = if (plan > 0) (real / plan).toFloat() else 0f
+            BarraProgreso(frac, if (frac > 1f) EstadoRojo else if (frac >= 0.9f) Color(0xFFF2C12E) else EstadoVerde)
+            Spacer(Modifier.height(4.dp))
+            Text(
+                when {
+                    r.cantidad == 0 -> "Sin categorías este mes"
+                    plan > 0 -> "Usado ${(real / plan * 100).toInt()}% del presupuesto"
+                    else -> "Sin presupuesto definido"
+                },
+                style = MaterialTheme.typography.labelSmall,
+                color = texto
+            )
+            if (excedidos > 0) {
+                Spacer(Modifier.height(10.dp))
+                Row(
+                    Modifier.fillMaxWidth().clip(RoundedCornerShape(10.dp)).background(EstadoRojo).padding(10.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(Icons.Default.Warning, null, tint = Color.White)
+                    Spacer(Modifier.width(8.dp))
+                    Text("$excedidos categoría(s) pasaron su presupuesto", color = Color.White, fontWeight = FontWeight.SemiBold)
+                }
+            }
+        }
+    }
 }

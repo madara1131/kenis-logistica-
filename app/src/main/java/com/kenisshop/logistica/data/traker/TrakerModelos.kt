@@ -96,3 +96,27 @@ data class DatosTraker(
             categorias.any { it.mes == mes && it.seccion == s } || capital(mes, s) != null
         }
 }
+
+/** Totales de una tarjeta de resumen (una sección en un mes). Se usa en la pantalla y en las pruebas. */
+data class ResumenTotales(
+    val presupuesto: Double,
+    val gastoReal: Double,
+    val capital: Double?,
+    val excedidos: Int,
+    val cantidad: Int
+) {
+    /** Si hay capital: saldo = capital − gasto real. Si no: disponible = presupuesto − gasto real. */
+    val disponible: Double get() = (capital ?: presupuesto) - gastoReal
+    val porcentajeUsado: Int? get() = if (presupuesto > 0) (gastoReal / presupuesto * 100).toInt() else null
+}
+
+fun DatosTraker.resumen(mes: String, seccion: SeccionTraker): ResumenTotales {
+    val c = categorias.filter { it.mes == mes && it.seccion == seccion }
+    return ResumenTotales(
+        presupuesto = c.sumOf { it.plan },
+        gastoReal = c.sumOf { it.real },
+        capital = capital(mes, seccion),
+        excedidos = c.count { it.estado() == EstadoGasto.EXCEDIDO },
+        cantidad = c.size
+    )
+}
