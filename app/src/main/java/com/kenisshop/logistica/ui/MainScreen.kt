@@ -21,6 +21,7 @@ import androidx.compose.material.icons.filled.Assessment
 import androidx.compose.material.icons.filled.DirectionsBoat
 import androidx.compose.material.icons.filled.Flight
 import androidx.compose.material.icons.filled.Insights
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -53,6 +54,8 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.kenisshop.logistica.R
+import com.kenisshop.logistica.data.EstadoPedido
+import com.kenisshop.logistica.data.FiltroBusqueda
 import com.kenisshop.logistica.data.TipoMercaderia
 import com.kenisshop.logistica.ui.theme.colorCabecera
 import com.kenisshop.logistica.ui.traker.TrakerScreen
@@ -66,12 +69,22 @@ fun MainScreen(vm: MainViewModel) {
     var tab by rememberSaveable { mutableStateOf(0) }
     var panel by rememberSaveable { mutableStateOf(PANEL_NINGUNO) }   // -1 nada, 0 formulario, >0 detalle (id)
     var verReportes by rememberSaveable { mutableStateOf(false) }
+    var verBusqueda by rememberSaveable { mutableStateOf(false) }
     var confirmarSalida by remember { mutableStateOf(false) }
 
     val esTablet = LocalConfiguration.current.screenWidthDp >= 600
     val tipo = if (tab == 0) TipoMercaderia.AEREA else TipoMercaderia.MARITIMA
     val delTipo = remember(todos, tipo) { todos.filter { it.tipo == tipo } }
     val cabecera = colorCabecera()
+
+    if (verBusqueda) {
+        BusquedaScreen(vm, todos, onVolver = { verBusqueda = false })
+        return
+    }
+    val abrirBusqueda: (EstadoPedido?) -> Unit = { estado ->
+        if (estado != null) vm.cambiarFiltro(FiltroBusqueda(estado = estado))
+        verBusqueda = true
+    }
 
     if (verReportes) {
         BackHandler { verReportes = false }
@@ -104,6 +117,11 @@ fun MainScreen(vm: MainViewModel) {
                         }
                     },
                     actions = {
+                        if (tab != 2) {
+                            IconButton(onClick = { abrirBusqueda(null) }) {
+                                Icon(Icons.Default.Search, "Buscar pedidos")
+                            }
+                        }
                         IconButton(onClick = { verReportes = true }) {
                             Icon(Icons.Default.Assessment, "Reportes")
                         }
@@ -163,6 +181,8 @@ fun MainScreen(vm: MainViewModel) {
                         seleccionado = panel.takeIf { it > 0 },
                         onSeleccionar = { panel = it.id },
                         onNuevo = { panel = PANEL_NUEVO },
+                        onBuscar = abrirBusqueda,
+                        filtroGuardado = vm.filtro,
                         modifier = Modifier.weight(0.42f).fillMaxHeight()
                     )
                     VerticalDivider()
@@ -183,6 +203,8 @@ fun MainScreen(vm: MainViewModel) {
                     seleccionado = null,
                     onSeleccionar = { panel = it.id },
                     onNuevo = { panel = PANEL_NUEVO },
+                    onBuscar = abrirBusqueda,
+                    filtroGuardado = vm.filtro,
                     modifier = Modifier.fillMaxSize()
                 )
             } else {

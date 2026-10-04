@@ -10,13 +10,17 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import com.kenisshop.logistica.data.traker.AjustesTraker
 import com.kenisshop.logistica.data.traker.CapitalMes
+import com.kenisshop.logistica.data.traker.TipoLista
+import com.kenisshop.logistica.data.traker.TrakerPrefs
 import com.kenisshop.logistica.data.traker.DatosTraker
 import com.kenisshop.logistica.data.traker.GastoCategoria
 import com.kenisshop.logistica.data.traker.ItemLista
 import com.kenisshop.logistica.data.traker.SeccionTraker
 import com.kenisshop.logistica.data.traker.TrakerDatabase
 import com.kenisshop.logistica.notif.Notificaciones
+import com.kenisshop.logistica.notif.RecordatoriosNotas
 import com.kenisshop.logistica.util.AnalizadorTraker
 import com.kenisshop.logistica.util.ImportadorTraker
 import com.kenisshop.logistica.util.LectorXlsx
@@ -237,20 +241,110 @@ class TrakerViewModel(app: Application) : AndroidViewModel(app) {
         )
     }
 
-    // ------------------------------------------------------------ Listas
+    // ------------------------------------------------------------ Listas, finanzas y libreta
+
+    private val prefs = TrakerPrefs(app)
+
+    var ajustes by mutableStateOf(prefs.leer())
+        private set
+
+    /** Ejecuta un cambio en las listas y avisa si se pasó un límite o se cumplió una meta. */
+    private suspend fun conAlertasListas(nuevosAjustes: AjustesTraker? = null, accion: suspend () -> Unit) {
+        val antes = dao.listas()
+        val ajAntes = ajustes
+        accion()
+        if (nuevosAjustes != null) {
+            prefs.guardar(nuevosAjustes)
+            ajustes = nuevosAjustes
+        }
+        val nuevas = AnalizadorTraker.nuevasListas(antes, ajAntes, dao.listas(), ajustes)
+        if (nuevas.isNotEmpty()) {
+            Notificaciones.traker(
+                getApplication<Application>(), 3003,
+                if (nuevas.any { it.grave }) "Traker: ¡límite superado!" else "Traker: buenas noticias",
+                nuevas.map { it.texto },
+                urgente = nuevas.any { it.grave }
+            )
+        }
+    }
 
     fun guardarItem(i: ItemLista) {
         viewModelScope.launch {
+            val ctx = getApplication<Application>()
             val limpio = i.copy(nombre = i.nombre.trim(), actualizado = System.currentTimeMillis())
-            if (limpio.id == 0L) dao.insertarItem(limpio) else dao.actualizarItem(limpio)
-            aviso("Guardado ✔")
+            conAlertasListas {
+                val id = if (limpio.id == 0L) dao.insertarItem(limpio) else {
+                    dao.actualizarItem(limpio); limpio.id
+                }
+                if (limpio.lista == TipoLista.NOTA) {
+                    val r = limpio.recordatorio
+                    if (r != null && r > System.currentTimeMillis()) RecordatoriosNotas.programar(ctx, id, r)
+                    else RecordatoriosNotas.cancelar(ctx, id)
+                }
+            }
+            val r = limpio.recordatorio
+            aviso(
+                if (limpio.lista == TipoLista.NOTA && r != null && r > System.currentTimeMillis())
+                    "Nota guardada ✔ · te avisaremos el ${java.time.Instant.ofEpochMilli(r).atZone(java.time.ZoneId.systemDefault()).format(java.time.format.DateTimeFormatter.ofPattern("dd/MM 'a las' HH:mm"))}"
+                else "Guardado ✔"
+            )
         }
     }
 
     fun borrarItem(i: ItemLista) {
         viewModelScope.launch {
+            if (i.lista == TipoLista.NOTA) RecordatoriosNotas.cancelar(getApplication<Application>(), i.id)
             dao.borrarItem(i)
             aviso("Registro eliminado")
+        }
+    }
+
+    /** Guarda el nuevo orden después de arrastrar y soltar. */
+    fun reordenar(lista: List<ItemLista>) {
+        viewModelScope.launch {
+            dao.actualizarItems(lista.mapIndexed { idx, it -> it.copy(orden = idx) })
+        }
+    }
+
+    fun abonar(deuda: ItemLista, monto: Double) {
+        viewModelScope.launch {
+            conAlertasListas {
+                val nuevo = ((deuda.pagado ?: 0.0) + monto).coerceAtMost(deuda.monto ?: Double.MAX_VALUE)
+                dao.actualizarItem(deuda.copy(pagado = nuevo, actualizado = System.currentTimeMillis()))
+            }
+            aviso("Abono registrado ✔")
+        }
+    }
+
+    fun alternarFijada(nota: ItemLista) {
+        viewModelScope.launch {
+            dao.actualizarItem(nota.copy(fijada = !nota.fijada))
+            aviso(if (nota.fijada) "Nota desfijada" else "📌 Nota fijada arriba")
+        }
+    }
+
+    fun guardarAjustes(nuevos: AjustesTraker) {
+        viewModelScope.launch {
+            conAlertasListas(nuevosAjustes = nuevos) { }
+        }
+    }
+
+    fun agregarPagina(nombre: String) {
+        val n = nombre.trim()
+        if (n.isEmpty() || ajustes.paginas.any { it.equals(n, true) }) return
+        guardarAjustes(ajustes.copy(paginas = ajustes.paginas + n))
+    }
+
+    /** Elimina la página; sus notas pasan a "General". */
+    fun borrarPagina(nombre: String) {
+        if (nombre == "General") return
+        viewModelScope.launch {
+            val notas = dao.listas().filter { it.lista == TipoLista.NOTA && it.pagina == nombre }
+            if (notas.isNotEmpty()) dao.actualizarItems(notas.map { it.copy(pagina = null) })
+            val nuevos = ajustes.copy(paginas = ajustes.paginas.filter { it != nombre })
+            prefs.guardar(nuevos)
+            ajustes = nuevos
+            aviso("Página eliminada · sus notas pasaron a General")
         }
     }
 }

@@ -1,6 +1,11 @@
 package com.kenisshop.logistica.util
 
+import com.kenisshop.logistica.data.traker.AjustesTraker
 import com.kenisshop.logistica.data.traker.DatosTraker
+import com.kenisshop.logistica.data.traker.ItemLista
+import com.kenisshop.logistica.data.traker.TipoLista
+import com.kenisshop.logistica.data.traker.pagada
+import com.kenisshop.logistica.data.traker.pendiente
 import com.kenisshop.logistica.data.traker.EstadoGasto
 import com.kenisshop.logistica.data.traker.GastoCategoria
 import com.kenisshop.logistica.data.traker.clave
@@ -82,5 +87,60 @@ object AnalizadorTraker {
             if (v.clave !in d) salida.add("➖ Ya no está: ${v.categoria} (${v.seccion.etiqueta}, ${Meses.etiqueta(v.mes)})")
         }
         return salida
+    }
+
+    // ------------------------------------------------ Listas: deudas, gastos extras y ahorros
+
+    data class TotalesListas(
+        val deudaTotal: Double,
+        val deudaPagada: Double,
+        val deudaPendiente: Double,
+        val extras: Double,
+        val ahorro: Double,
+        val diezmo: Double
+    )
+
+    fun totales(items: List<ItemLista>): TotalesListas {
+        val deudas = items.filter { it.lista == TipoLista.DEUDA }
+        return TotalesListas(
+            deudaTotal = deudas.sumOf { it.monto ?: 0.0 },
+            deudaPagada = deudas.sumOf { minOf(it.pagado ?: 0.0, it.monto ?: 0.0) },
+            deudaPendiente = deudas.sumOf { it.pendiente },
+            extras = items.filter { it.lista == TipoLista.GASTO_EXTRA }.sumOf { it.monto ?: 0.0 },
+            ahorro = items.filter { it.lista == TipoLista.AHORRO }.sumOf { it.monto ?: 0.0 },
+            diezmo = items.filter { it.lista == TipoLista.DIEZMO }.sumOf { it.monto ?: 0.0 }
+        )
+    }
+
+    /** Alertas de límites y metas. grave = sobrepasó un límite. */
+    fun alertasListas(items: List<ItemLista>, a: AjustesTraker): List<Alerta> {
+        val t = totales(items)
+        val lista = ArrayList<Alerta>()
+        a.limiteDeudas?.let { lim ->
+            if (t.deudaPendiente > lim) {
+                lista.add(Alerta("LIM_DEU", "🔴 Deudas pendientes ${Dinero.fmt(t.deudaPendiente)} superan tu límite de ${Dinero.fmt(lim)}", true))
+            }
+        }
+        a.limiteExtras?.let { lim ->
+            if (t.extras > lim) {
+                lista.add(Alerta("LIM_EXT", "🔴 Gastos extras ${Dinero.fmt(t.extras)} superan tu límite de ${Dinero.fmt(lim)}", true))
+            } else if (lim > 0 && t.extras >= lim * 0.9) {
+                lista.add(Alerta("CER_EXT", "🟡 Gastos extras van en ${(t.extras / lim * 100).toInt()}% del límite", false))
+            }
+        }
+        a.metaAhorro?.let { meta ->
+            if (meta > 0 && t.ahorro >= meta) {
+                lista.add(Alerta("META_AHO", "🎉 ¡Alcanzaste tu meta de ahorro de ${Dinero.fmt(meta)}!", false))
+            }
+        }
+        for (d in items) {
+            if (d.pagada) lista.add(Alerta("PAG|${d.id}", "✅ Deuda \"${d.nombre}\" pagada por completo", false))
+        }
+        return lista
+    }
+
+    fun nuevasListas(antes: List<ItemLista>, ajAntes: AjustesTraker, despues: List<ItemLista>, ajDespues: AjustesTraker): List<Alerta> {
+        val previas = alertasListas(antes, ajAntes).map { it.clave }.toHashSet()
+        return alertasListas(despues, ajDespues).filter { it.clave !in previas }
     }
 }

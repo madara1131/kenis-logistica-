@@ -9,7 +9,6 @@ import androidx.compose.ui.graphics.Color
 import com.kenisshop.logistica.data.EstadoPedido
 
 val AzulKenis = Color(0xFF1E4E9A)
-val AzulOscuro = Color(0xFF173E7C)
 val VerdeGuardar = Color(0xFF2E9E44)
 val RosaKenis = Color(0xFFD9468F)
 

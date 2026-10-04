@@ -2,6 +2,9 @@
 
 package com.kenisshop.logistica.ui
 
+import com.kenisshop.logistica.data.tarifaAplicada
+import com.kenisshop.logistica.data.totalPagar
+import com.kenisshop.logistica.util.Dolares
 import android.widget.Toast
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -87,6 +90,9 @@ fun DetallePedido(id: Long, vm: MainViewModel, mostrarVolver: Boolean, onCerrar:
     val context = LocalContext.current
     val estado = p.estado()
     var verFoto by remember { mutableStateOf(false) }
+    var editarPeso by remember { mutableStateOf(false) }
+    var editarCliente by remember { mutableStateOf(false) }
+    var eliminar by remember { mutableStateOf(false) }
 
     Column(
         Modifier
@@ -162,8 +168,44 @@ fun DetallePedido(id: Long, vm: MainViewModel, mostrarVolver: Boolean, onCerrar:
                     )
                 }
 
-                Dato("Marca de ingreso", p.marcaIngreso)
-                Dato("Origen de la mercadería", p.origen)
+                if (p.marcaIngreso.isNotBlank()) Dato("Marca de ingreso (dato anterior)", p.marcaIngreso)
+                Row(
+                    Modifier.fillMaxWidth().clickable { editarCliente = true },
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column(Modifier.weight(1f)) { Dato("Cliente", p.cliente ?: "Sin cliente (toca para agregar)") }
+                    Text("Editar", color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.SemiBold)
+                }
+                Dato("Origen / marca", p.origen)
+                // Peso y cobro
+                Column(
+                    Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(14.dp))
+                        .background(VerdeGuardar.copy(alpha = 0.10f))
+                        .clickable { editarPeso = true }
+                        .padding(14.dp)
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text("⚖️ Peso y cobro", fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
+                        Text(if (p.pesoLibras == null) "Agregar peso" else "Editar", color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.SemiBold)
+                    }
+                    Spacer(Modifier.height(6.dp))
+                    Row {
+                        Column(Modifier.weight(1f)) {
+                            Text("Peso total", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            Text(Dolares.libras(p.pesoLibras), fontWeight = FontWeight.SemiBold)
+                        }
+                        Column(Modifier.weight(1f)) {
+                            Text("Por libra", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            Text(Dolares.fmt(p.tarifaAplicada), fontWeight = FontWeight.SemiBold)
+                        }
+                        Column(Modifier.weight(1f)) {
+                            Text("A pagar", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            Text(Dolares.fmt(p.totalPagar), fontWeight = FontWeight.Black, color = VerdeGuardar)
+                        }
+                    }
+                }
                 Dato("Empresa de envío a casillero Miami", p.empresaEnvio)
                 Dato("Fecha del pedido", Fechas.formatear(p.fechaPedido))
                 Dato("Llegada a Miami", if (p.fechaMiami == null) "Pendiente" else Fechas.formatear(p.fechaMiami))
@@ -234,11 +276,20 @@ fun DetallePedido(id: Long, vm: MainViewModel, mostrarVolver: Boolean, onCerrar:
                     }
                 }
 
+                OutlinedButton(
+                    onClick = { eliminar = true },
+                    modifier = Modifier.fillMaxWidth().height(48.dp),
+                    shape = RoundedCornerShape(14.dp),
+                    colors = ButtonDefaults.outlinedButtonColors(contentColor = EstadoRojo)
+                ) {
+                    Text("ELIMINAR PEDIDO")
+                }
+
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Icon(Icons.Default.Info, null, tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(16.dp))
                     Spacer(Modifier.width(6.dp))
                     Text(
-                        "El código y los datos originales no se pueden modificar. Solo se edita la fecha de ingreso.",
+                        "El código y los datos originales no se modifican. Se pueden editar la fecha de ingreso, el peso y el cliente.",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -246,6 +297,20 @@ fun DetallePedido(id: Long, vm: MainViewModel, mostrarVolver: Boolean, onCerrar:
             }
         }
         Spacer(Modifier.height(16.dp))
+    }
+
+    if (editarPeso) {
+        DialogoPeso(p, onGuardar = { peso, tarifa -> vm.actualizarPeso(p.id, peso, tarifa) }, onCerrar = { editarPeso = false })
+    }
+    if (editarCliente) {
+        DialogoCliente(p, onGuardar = { vm.actualizarCliente(p.id, it) }, onCerrar = { editarCliente = false })
+    }
+    if (eliminar) {
+        DialogoEliminarPedido(p, onEliminar = {
+            vm.eliminarPedido(p)
+            Toast.makeText(context, "Pedido eliminado", Toast.LENGTH_SHORT).show()
+            onCerrar()
+        }, onCerrar = { eliminar = false })
     }
 
     if (verFoto && p.fotoPath != null) {

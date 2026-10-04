@@ -8,6 +8,8 @@ import android.graphics.pdf.PdfDocument
 import androidx.core.content.FileProvider
 import com.kenisshop.logistica.data.EstadoPedido
 import com.kenisshop.logistica.data.Pedido
+import com.kenisshop.logistica.data.tarifaAplicada
+import com.kenisshop.logistica.data.totalPagar
 import java.io.File
 import java.io.FileOutputStream
 import java.time.LocalDateTime
@@ -20,17 +22,20 @@ object Exportador {
     const val MIME_PDF = "application/pdf"
 
     private val encabezados = listOf(
-        "Código", "Tipo", "Estado", "Empresa Miami", "Origen",
-        "Marca de ingreso", "Fecha pedido", "Llegada Miami", "Fecha ingreso", "Días"
+        "Código", "Cliente", "Tipo", "Estado", "Empresa Miami", "Origen",
+        "Peso (lb)", "US$/lb", "A pagar US$", "Fecha pedido", "Llegada Miami", "Fecha ingreso", "Días"
     )
 
     private fun fila(p: Pedido): List<String> = listOf(
         p.codigo,
+        p.cliente ?: "",
         p.tipo.etiqueta,
         p.estado().etiqueta,
         p.empresaEnvio,
         p.origen,
-        p.marcaIngreso,
+        p.pesoLibras?.let { Dolares.numero(it) } ?: "—",
+        Dolares.numero(p.tarifaAplicada),
+        p.totalPagar?.let { Dolares.numero(it) } ?: "—",
         Fechas.formatear(p.fechaPedido),
         Fechas.formatear(p.fechaMiami),
         Fechas.formatear(p.fechaIngreso),
@@ -75,7 +80,7 @@ object Exportador {
         sb.append("""<?xml version="1.0" encoding="UTF-8" standalone="yes"?>""")
         sb.append("""<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">""")
         sb.append("<cols>")
-        val anchos = listOf(16, 11, 13, 15, 18, 20, 13, 14, 14, 7)
+        val anchos = listOf(14, 18, 10, 13, 14, 18, 10, 9, 12, 13, 14, 14, 7)
         anchos.forEachIndexed { i, w ->
             sb.append("<col min=\"${i + 1}\" max=\"${i + 1}\" width=\"$w\" customWidth=\"1\"/>")
         }
@@ -107,7 +112,7 @@ object Exportador {
         val alto = 595
         val margen = 30f
         val altoFila = 18f
-        val columnas = floatArrayOf(80f, 55f, 65f, 80f, 100f, 100f, 70f, 70f, 70f, 40f)
+        val columnas = floatArrayOf(64f, 70f, 46f, 56f, 64f, 80f, 44f, 38f, 56f, 60f, 60f, 60f, 30f)
 
         val pTitulo = Paint().apply { textSize = 18f; isFakeBoldText = true; isAntiAlias = true; color = 0xFF1E4E9A.toInt() }
         val pTexto = Paint().apply { textSize = 9f; isAntiAlias = true; color = 0xFF222222.toInt() }
@@ -150,7 +155,7 @@ object Exportador {
             var x = margen
             val estado = p.estado()
             fila(p).forEachIndexed { i, v ->
-                val paint = if (i == 2) Paint(pTexto).apply { isFakeBoldText = true; color = colorEstado(estado) } else pTexto
+                val paint = if (i == 3) Paint(pTexto).apply { isFakeBoldText = true; color = colorEstado(estado) } else pTexto
                 canvas.drawText(recortar(v, columnas[i] - 6f, paint), x + 4f, y + 12.5f, paint)
                 x += columnas[i]
             }

@@ -67,9 +67,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.kenisshop.logistica.data.traker.EstadoGasto
 import com.kenisshop.logistica.data.traker.GastoCategoria
-import com.kenisshop.logistica.data.traker.ItemLista
 import com.kenisshop.logistica.data.traker.SeccionTraker
-import com.kenisshop.logistica.data.traker.TipoLista
 import com.kenisshop.logistica.data.traker.diferencia
 import com.kenisshop.logistica.data.traker.estado
 import com.kenisshop.logistica.data.traker.plan
@@ -475,105 +473,6 @@ fun EditorCategoria(
             },
             dismissButton = { TextButton(onClick = { confirmarBorrar = false }) { Text("Cancelar") } }
         )
-    }
-}
-
-// ------------------------------------------------------------------ Editor de listas
-
-@Composable
-fun EditorItem(
-    existente: ItemLista?,
-    tipo: TipoLista,
-    onGuardar: (ItemLista) -> Unit,
-    onBorrar: (ItemLista) -> Unit,
-    onCerrar: () -> Unit
-) {
-    val hoja = rememberModalBottomSheetState(skipPartiallyExpanded = true)
-    var nombre by remember { mutableStateOf(existente?.nombre ?: "") }
-    var monto by remember { mutableStateOf(Dinero.editable(existente?.monto)) }
-    var error by remember { mutableStateOf<String?>(null) }
-
-    ModalBottomSheet(onDismissRequest = onCerrar, sheetState = hoja) {
-        Column(
-            Modifier
-                .fillMaxWidth()
-                .verticalScroll(rememberScrollState())
-                .padding(horizontal = 20.dp)
-                .padding(bottom = 24.dp)
-                .navigationBarsPadding()
-                .imePadding(),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
-        ) {
-            Text(
-                "${tipo.emoji} ${if (existente == null) "Agregar a" else "Editar en"} ${tipo.etiqueta}",
-                style = MaterialTheme.typography.titleLarge,
-                fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.primary
-            )
-            OutlinedTextField(
-                value = nombre,
-                onValueChange = { nombre = it; error = null },
-                label = { Text(tipo.etiquetaNombre) },
-                singleLine = tipo != TipoLista.NOTA,
-                minLines = if (tipo == TipoLista.NOTA) 3 else 1,
-                keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Sentences),
-                modifier = Modifier.fillMaxWidth()
-            )
-            if (tipo == TipoLista.AHORRO || tipo == TipoLista.DIEZMO) {
-                FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                    (1..12).forEach { m ->
-                        ChipFiltro(Meses.nombre(m).take(3), nombre == Meses.nombre(m), MaterialTheme.colorScheme.primary) {
-                            nombre = Meses.nombre(m)
-                        }
-                    }
-                }
-            }
-            if (tipo.conMonto) {
-                OutlinedTextField(
-                    value = monto,
-                    onValueChange = { monto = it; error = null },
-                    label = { Text("Monto") },
-                    prefix = { Text("C$ ") },
-                    singleLine = true,
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
-                    modifier = Modifier.fillMaxWidth()
-                )
-            }
-            error?.let { Text(it, color = EstadoRojo, fontWeight = FontWeight.SemiBold) }
-            Button(
-                onClick = {
-                    val m = if (monto.isBlank()) null else Dinero.parsear(monto)
-                    when {
-                        nombre.isBlank() -> error = "Escribe ${tipo.etiquetaNombre.lowercase()}"
-                        tipo.conMonto && monto.isNotBlank() && m == null -> error = "El monto no es un número válido"
-                        else -> {
-                            val base = existente ?: ItemLista(lista = tipo, nombre = nombre, monto = null, orden = Int.MAX_VALUE / 2)
-                            onGuardar(base.copy(nombre = nombre.trim(), monto = if (tipo.conMonto) m else null))
-                            onCerrar()
-                        }
-                    }
-                },
-                modifier = Modifier.fillMaxWidth().height(54.dp),
-                shape = RoundedCornerShape(14.dp),
-                colors = ButtonDefaults.buttonColors(containerColor = VerdeGuardar, contentColor = Color.White)
-            ) {
-                Icon(Icons.Default.Save, null)
-                Spacer(Modifier.width(8.dp))
-                Text(if (existente == null) "GUARDAR" else "ACTUALIZAR", fontWeight = FontWeight.Bold)
-            }
-            if (existente != null) {
-                OutlinedButton(
-                    onClick = { onBorrar(existente); onCerrar() },
-                    modifier = Modifier.fillMaxWidth().height(50.dp),
-                    shape = RoundedCornerShape(14.dp),
-                    colors = ButtonDefaults.outlinedButtonColors(contentColor = EstadoRojo)
-                ) {
-                    Icon(Icons.Default.Delete, null)
-                    Spacer(Modifier.width(8.dp))
-                    Text("ELIMINAR")
-                }
-            }
-        }
     }
 }
 

@@ -1,5 +1,6 @@
 package com.kenisshop.logistica.data.traker
 
+import androidx.room.ColumnInfo
 import androidx.room.Entity
 import androidx.room.Index
 import androidx.room.PrimaryKey
@@ -71,7 +72,34 @@ data class ItemLista(
     val nombre: String,
     val monto: Double?,
     val orden: Int = 0,
-    val actualizado: Long = System.currentTimeMillis()
+    val actualizado: Long = System.currentTimeMillis(),
+    /** Deudas: cuánto se ha abonado */
+    val pagado: Double? = null,
+    /** Gastos extras: fecha del gasto */
+    val fecha: Long? = null,
+    /** Libreta: página o sección de la nota */
+    val pagina: String? = null,
+    /** Libreta: etiquetas separadas por coma */
+    val etiquetas: String? = null,
+    /** Libreta: fecha y hora del recordatorio */
+    val recordatorio: Long? = null,
+    @ColumnInfo(defaultValue = "0") val fijada: Boolean = false,
+    /** Libreta: color de la hoja (ARGB) */
+    val color: Int? = null
+)
+
+val ItemLista.pendiente: Double get() = ((monto ?: 0.0) - (pagado ?: 0.0)).coerceAtLeast(0.0)
+val ItemLista.pagada: Boolean get() = lista == TipoLista.DEUDA && (monto ?: 0.0) > 0.0 && pendiente <= 0.0
+val ItemLista.listaEtiquetas: List<String>
+    get() = etiquetas?.split(",")?.map { it.trim() }?.filter { it.isNotEmpty() } ?: emptyList()
+val ItemLista.paginaNombre: String get() = pagina?.takeIf { it.isNotBlank() } ?: "General"
+
+/** Límites y metas que define el usuario (se guardan en el teléfono). */
+data class AjustesTraker(
+    val limiteDeudas: Double? = null,
+    val limiteExtras: Double? = null,
+    val metaAhorro: Double? = null,
+    val paginas: List<String> = listOf("General")
 )
 
 /** Foto completa de los datos del Traker. */

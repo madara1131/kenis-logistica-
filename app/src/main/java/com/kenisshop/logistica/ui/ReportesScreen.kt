@@ -2,6 +2,8 @@
 
 package com.kenisshop.logistica.ui
 
+import com.kenisshop.logistica.data.resumenPorOrigen
+import com.kenisshop.logistica.util.Dolares
 import android.widget.Toast
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -12,7 +14,6 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
@@ -231,6 +232,19 @@ fun ReportesScreen(todos: List<Pedido>, onVolver: () -> Unit) {
                                     Text("$n", color = e.colorTexto(), style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
                                     Text(e.etiqueta, color = e.colorTexto(), style = MaterialTheme.typography.labelMedium)
                                 }
+                            }
+                        }
+                        val (totPeso, porOrigen) = resumenPorOrigen(filtrados)
+                        Row {
+                            Text("⚖️ Peso total: ${Dolares.libras(totPeso.libras)}", fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f))
+                            Text(Dolares.fmt(totPeso.dolares), fontWeight = FontWeight.Bold, color = VerdeGuardar)
+                        }
+                        Text("Libras y dinero por marca / origen", style = MaterialTheme.typography.labelLarge)
+                        porOrigen.forEach { o ->
+                            Row {
+                                Text(o.origen, modifier = Modifier.weight(1f))
+                                Text(Dolares.libras(o.libras), modifier = Modifier.padding(end = 12.dp))
+                                Text(Dolares.fmt(o.dolares), fontWeight = FontWeight.Bold)
                             }
                         }
                         Text("Por empresa de envío", style = MaterialTheme.typography.labelLarge)

@@ -13,8 +13,8 @@ android {
         applicationId = "com.kenisshop.logistica"
         minSdk = 26
         targetSdk = 34
-        versionCode = 4
-        versionName = "1.3"
+        versionCode = 10
+        versionName = "1.9"
     }
 
     // Firma fija: así cada APK nuevo se instala ENCIMA del anterior sin perder los datos.

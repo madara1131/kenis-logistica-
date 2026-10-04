@@ -50,6 +50,12 @@ abstract class TrakerDao {
     @Delete
     abstract suspend fun borrarItem(i: ItemLista)
 
+    @Update
+    abstract suspend fun actualizarItems(lista: List<ItemLista>)
+
+    @Query("SELECT * FROM traker_listas WHERE id = :id")
+    abstract suspend fun item(id: Long): ItemLista?
+
     @Query("DELETE FROM traker_categorias WHERE mes = :mes")
     abstract suspend fun borrarCategoriasMes(mes: String)
 

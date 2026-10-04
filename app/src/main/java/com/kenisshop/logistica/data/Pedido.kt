@@ -5,9 +5,10 @@ import androidx.room.Index
 import androidx.room.PrimaryKey
 import com.kenisshop.logistica.util.Fechas
 
-enum class TipoMercaderia(val etiqueta: String, val diasLimite: Int) {
-    AEREA("Aérea", 15),
-    MARITIMA("Marítima", 25)
+/** [tarifaLibra] = dólares que se pagan por cada libra según el tipo de envío. */
+enum class TipoMercaderia(val etiqueta: String, val diasLimite: Int, val tarifaLibra: Double) {
+    AEREA("Aérea", 15, 5.5),
+    MARITIMA("Marítima", 25, 2.0)
 }
 
 enum class EstadoPedido(val etiqueta: String) {
@@ -17,7 +18,7 @@ enum class EstadoPedido(val etiqueta: String) {
     VENCIDO("Vencido")
 }
 
-val EMPRESAS_ENVIO = listOf("USPS", "BOFO", "FedEx", "UPS", "DHL Express", "Shein")
+val EMPRESAS_ENVIO = listOf("USPS", "GOFO", "FedEx", "UPS", "DHL Express", "Shein", "Speedx")
 
 @Entity(tableName = "pedidos", indices = [Index(value = ["codigo"], unique = true)])
 data class Pedido(
@@ -34,7 +35,13 @@ data class Pedido(
     val fechaMiami: Long? = null,
     /** Etapa 3: ingreso final en nuestras manos */
     val fechaIngreso: Long? = null,
-    val creadoEn: Long = System.currentTimeMillis()
+    val creadoEn: Long = System.currentTimeMillis(),
+    /** Peso total del pedido en libras */
+    val pesoLibras: Double? = null,
+    /** Dólares a pagar por libra (5.5 aéreo, 2 marítimo por defecto) */
+    val tarifaLibra: Double? = null,
+    /** Cliente para quien es el pedido (opcional) */
+    val cliente: String? = null
 ) {
     /** Días desde el pedido hasta hoy (o hasta el ingreso si ya ingresó). */
     fun diasTranscurridos(ahora: Long = System.currentTimeMillis()): Long =
@@ -47,4 +54,31 @@ data class Pedido(
         fechaMiami != null -> EstadoPedido.EN_TRANSITO
         else -> EstadoPedido.PENDIENTE
     }
+}
+
+// ------------------------------------------------ Peso y cobro por libra
+
+/** Calcula lo que se paga: peso × tarifa por libra (redondeado a centavos). */
+fun calcularCobro(pesoLibras: Double?, tarifaLibra: Double?): Double? =
+    if (pesoLibras == null || tarifaLibra == null) null
+    else Math.round(pesoLibras * tarifaLibra * 100.0) / 100.0
+
+val Pedido.tarifaAplicada: Double get() = tarifaLibra ?: tipo.tarifaLibra
+val Pedido.totalPagar: Double? get() = calcularCobro(pesoLibras, tarifaAplicada)
+
+data class ResumenPeso(val origen: String, val pedidos: Int, val libras: Double, val dolares: Double, val sinPeso: Int)
+
+/** Libras y dólares por cada tienda/marca de origen, y el total general (origen = "Total"). */
+fun resumenPorOrigen(pedidos: List<Pedido>): Pair<ResumenPeso, List<ResumenPeso>> {
+    fun resumir(nombre: String, lista: List<Pedido>) = ResumenPeso(
+        origen = nombre,
+        pedidos = lista.size,
+        libras = Math.round(lista.sumOf { it.pesoLibras ?: 0.0 } * 100.0) / 100.0,
+        dolares = Math.round(lista.sumOf { it.totalPagar ?: 0.0 } * 100.0) / 100.0,
+        sinPeso = lista.count { it.pesoLibras == null }
+    )
+    val porOrigen = pedidos.groupBy { it.origen.trim().ifEmpty { "Sin origen" } }
+        .map { (k, v) -> resumir(k, v) }
+        .sortedByDescending { it.dolares }
+    return resumir("Total", pedidos) to porOrigen
 }

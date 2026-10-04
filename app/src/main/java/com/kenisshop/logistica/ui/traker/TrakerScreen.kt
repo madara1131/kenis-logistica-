@@ -82,7 +82,6 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.kenisshop.logistica.data.traker.DatosTraker
 import com.kenisshop.logistica.data.traker.EstadoGasto
 import com.kenisshop.logistica.data.traker.GastoCategoria
-import com.kenisshop.logistica.data.traker.ItemLista
 import com.kenisshop.logistica.data.traker.SeccionTraker
 import com.kenisshop.logistica.data.traker.TipoLista
 import com.kenisshop.logistica.data.traker.estado
@@ -101,7 +100,6 @@ import com.kenisshop.logistica.util.Meses
 import kotlinx.coroutines.launch
 
 private data class EdicionCategoria(val existente: GastoCategoria?, val mes: String, val seccion: SeccionTraker)
-private data class EdicionItem(val existente: ItemLista?, val tipo: TipoLista)
 private data class EdicionCapital(val mes: String, val seccion: SeccionTraker)
 
 private val COLOR_SECCION = mapOf(
@@ -121,7 +119,6 @@ fun TrakerScreen(vm: TrakerViewModel = viewModel()) {
     val datos by vm.datos.collectAsStateWithLifecycle()
     var vista by rememberSaveable { mutableStateOf(0) }
     var editCat by remember { mutableStateOf<EdicionCategoria?>(null) }
-    var editItem by remember { mutableStateOf<EdicionItem?>(null) }
     var editCapital by remember { mutableStateOf<EdicionCapital?>(null) }
 
     val selector = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
@@ -166,12 +163,7 @@ fun TrakerScreen(vm: TrakerViewModel = viewModel()) {
                         onNueva = { editCat = EdicionCategoria(null, d.meses.lastOrNull() ?: Meses.actual(), SeccionTraker.PERSONAL) }
                     )
                     2 -> VistaGraficos(d)
-                    else -> VistaListas(
-                        d,
-                        onEditar = { editItem = EdicionItem(it, it.lista) },
-                        onNuevo = { editItem = EdicionItem(null, it) },
-                        onBorrar = { vm.borrarItem(it) }
-                    )
+                    else -> ListasTraker(d, vm)
                 }
             }
         }
@@ -193,15 +185,6 @@ fun TrakerScreen(vm: TrakerViewModel = viewModel()) {
             onGuardar = { vm.guardarCategoria(it) },
             onBorrar = { vm.borrarCategoria(it) },
             onCerrar = { editCat = null }
-        )
-    }
-    editItem?.let { e ->
-        EditorItem(
-            existente = e.existente,
-            tipo = e.tipo,
-            onGuardar = { vm.guardarItem(it) },
-            onBorrar = { vm.borrarItem(it) },
-            onCerrar = { editItem = null }
         )
     }
     editCapital?.let { e ->
@@ -745,71 +728,6 @@ private fun DatoClave(titulo: String, valor: String, modifier: Modifier = Modifi
             Spacer(Modifier.height(4.dp))
             Text(valor, style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onPrimaryContainer, maxLines = 3)
         }
-    }
-}
-
-// ====================================================================== Vista LISTAS
-
-@Composable
-private fun VistaListas(
-    d: DatosTraker,
-    onEditar: (ItemLista) -> Unit,
-    onNuevo: (TipoLista) -> Unit,
-    onBorrar: (ItemLista) -> Unit
-) {
-    LazyColumn(
-        Modifier.fillMaxSize(),
-        contentPadding = PaddingValues(12.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp)
-    ) {
-        TipoLista.entries.forEach { tipo ->
-            val registros = d.listas.filter { it.lista == tipo }
-            item(key = tipo.name) {
-                Card(
-                    shape = RoundedCornerShape(16.dp),
-                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-                    elevation = CardDefaults.cardElevation(2.dp),
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Text(
-                                "${tipo.emoji} ${tipo.etiqueta}",
-                                style = MaterialTheme.typography.titleMedium,
-                                fontWeight = FontWeight.Bold,
-                                color = MaterialTheme.colorScheme.primary,
-                                modifier = Modifier.weight(1f)
-                            )
-                            if (tipo.conMonto) {
-                                Text(Dinero.fmt(registros.sumOf { it.monto ?: 0.0 }), fontWeight = FontWeight.Bold)
-                            }
-                            IconButton(onClick = { onNuevo(tipo) }) { Icon(Icons.Default.Add, "Agregar") }
-                        }
-                        if (registros.isEmpty()) {
-                            Text("Sin registros", color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall)
-                        }
-                        registros.forEach { it2 ->
-                            key(it2.id) {
-                                DeslizarParaBorrar("Se eliminará \"${it2.nombre}\".", { onBorrar(it2) }) {
-                                    Surface(
-                                        onClick = { onEditar(it2) },
-                                        shape = RoundedCornerShape(10.dp),
-                                        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
-                                        modifier = Modifier.fillMaxWidth()
-                                    ) {
-                                        Row(Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
-                                            Text(it2.nombre, Modifier.weight(1f))
-                                            if (tipo.conMonto) Text(Dinero.fmt(it2.monto), fontWeight = FontWeight.SemiBold)
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        }
-        item { Spacer(Modifier.height(24.dp)) }
     }
 }
 

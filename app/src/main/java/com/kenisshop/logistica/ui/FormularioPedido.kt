@@ -68,6 +68,8 @@ import com.kenisshop.logistica.data.TipoMercaderia
 import com.kenisshop.logistica.ui.theme.EstadoRojo
 import com.kenisshop.logistica.ui.theme.VerdeGuardar
 import com.kenisshop.logistica.ui.theme.colorCabecera
+import com.kenisshop.logistica.util.Dinero
+import com.kenisshop.logistica.util.numeroDe
 import com.kenisshop.logistica.util.Fechas
 import com.kenisshop.logistica.util.Fotos
 import kotlinx.coroutines.Dispatchers
@@ -91,7 +93,9 @@ fun FormularioPedido(
     var codigo by rememberSaveable { mutableStateOf("") }
     var empresa by rememberSaveable { mutableStateOf<String?>(null) }
     var origen by rememberSaveable { mutableStateOf("") }
-    var marca by rememberSaveable { mutableStateOf("") }
+    var peso by rememberSaveable { mutableStateOf("") }
+    var cliente by rememberSaveable { mutableStateOf("") }
+    var tarifa by rememberSaveable(tipo) { mutableStateOf(Dinero.editable(tipo.tarifaLibra)) }
     var fechaPedido by rememberSaveable { mutableStateOf<Long?>(Fechas.hoy()) }
     var fechaMiami by rememberSaveable { mutableStateOf<Long?>(null) }
     var fechaIngreso by rememberSaveable { mutableStateOf<Long?>(null) }
@@ -115,7 +119,7 @@ fun FormularioPedido(
     }
 
     fun limpiar() {
-        codigo = ""; empresa = null; origen = ""; marca = ""
+        codigo = ""; cliente = ""; empresa = null; origen = ""; peso = ""; tarifa = Dinero.editable(tipo.tarifaLibra)
         fechaPedido = Fechas.hoy(); fechaMiami = null; fechaIngreso = null
         fotoPath = null; archivoCamara = null; mostrarErrores = false; mensajeError = null
     }
@@ -128,7 +132,8 @@ fun FormularioPedido(
             codigo.isBlank() -> "Ingrese el código de pedido"
             empresa == null -> "Seleccione la empresa de envío al casillero en Miami"
             origen.isBlank() -> "Ingrese el origen de la mercadería"
-            marca.isBlank() -> "Ingrese la marca de ingreso"
+            peso.isNotBlank() && (numeroDe(peso) == null || numeroDe(peso)!! < 0) -> "El peso no es un número válido"
+            tarifa.isBlank() || numeroDe(tarifa) == null || numeroDe(tarifa)!! < 0 -> "Escriba el pago por libra"
             fp == null -> "Seleccione la fecha del pedido"
             fotoPath == null -> "Agregue la foto del pedido (Tomar foto o Subir imagen)"
             fm != null && fm < fp -> "La llegada a Miami no puede ser antes del pedido"
@@ -149,12 +154,15 @@ fun FormularioPedido(
             codigo = codigo.trim().uppercase(),
             tipo = tipo,
             fotoPath = fotoPath,
-            marcaIngreso = marca.trim(),
+            marcaIngreso = "",
             origen = origen.trim(),
             empresaEnvio = empresa!!,
             fechaPedido = fechaPedido!!,
             fechaMiami = fechaMiami,
-            fechaIngreso = fechaIngreso
+            fechaIngreso = fechaIngreso,
+            pesoLibras = if (peso.isBlank()) null else numeroDe(peso),
+            tarifaLibra = numeroDe(tarifa),
+            cliente = cliente.trim().ifEmpty { null }
         )
         scope.launch {
             val resultado = vm.guardar(pedido)
@@ -226,6 +234,16 @@ fun FormularioPedido(
                     modifier = Modifier.fillMaxWidth()
                 )
 
+                OutlinedTextField(
+                    value = cliente,
+                    onValueChange = { cliente = it },
+                    label = { Text("Cliente (opcional)") },
+                    placeholder = { Text("¿Para quién es el pedido?") },
+                    singleLine = true,
+                    keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Words),
+                    modifier = Modifier.fillMaxWidth()
+                )
+
                 Column {
                     Text(
                         "Empresa de envío al casillero en Miami *",
@@ -246,7 +264,7 @@ fun FormularioPedido(
                     OutlinedTextField(
                         value = origen,
                         onValueChange = { origen = it; mensajeError = null },
-                        label = { Text("Origen de la mercadería (país / empresa) *") },
+                        label = { Text("Origen / marca (tienda o país) *") },
                         singleLine = true,
                         isError = mostrarErrores && origen.isBlank(),
                         keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Words),
@@ -259,15 +277,22 @@ fun FormularioPedido(
                     }
                 }
 
-                OutlinedTextField(
-                    value = marca,
-                    onValueChange = { marca = it; mensajeError = null },
-                    label = { Text("Marca de ingreso *") },
-                    singleLine = true,
-                    isError = mostrarErrores && marca.isBlank(),
-                    keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Sentences),
-                    modifier = Modifier.fillMaxWidth()
-                )
+                // Peso total + pago por libra con el cálculo en tiempo real
+                Box(
+                    Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(16.dp))
+                        .background(MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.35f))
+                        .padding(12.dp)
+                ) {
+                    CalculadoraPeso(
+                        tipo = tipo,
+                        peso = peso,
+                        onPeso = { peso = it; mensajeError = null },
+                        tarifa = tarifa,
+                        onTarifa = { tarifa = it; mensajeError = null }
+                    )
+                }
 
                 CampoFecha(
                     etiqueta = "Fecha de realización del pedido *",

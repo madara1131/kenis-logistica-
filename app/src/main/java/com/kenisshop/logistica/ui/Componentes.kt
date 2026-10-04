@@ -2,13 +2,17 @@
 
 package com.kenisshop.logistica.ui
 
+import com.kenisshop.logistica.data.resumenPorOrigen
+import com.kenisshop.logistica.data.totalPagar
+import com.kenisshop.logistica.util.Dolares
 import android.app.DatePickerDialog
 import android.content.Context
 import android.content.DialogInterface
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.shape.CircleShape
+import com.kenisshop.logistica.data.FiltroBusqueda
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -22,7 +26,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
@@ -59,7 +62,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
-import com.kenisshop.logistica.data.EMPRESAS_ENVIO
 import com.kenisshop.logistica.data.EstadoPedido
 import com.kenisshop.logistica.data.Pedido
 import com.kenisshop.logistica.ui.theme.EstadoRojo
@@ -224,6 +226,9 @@ fun TarjetaPedido(p: Pedido, seleccionado: Boolean, onClick: () -> Unit) {
                         overflow = TextOverflow.Ellipsis
                     )
                 }
+                p.cliente?.let {
+                    Text("👤 $it", style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                }
                 Text(
                     "${p.empresaEnvio} · Origen: ${p.origen}",
                     style = MaterialTheme.typography.bodyMedium,
@@ -238,6 +243,9 @@ fun TarjetaPedido(p: Pedido, seleccionado: Boolean, onClick: () -> Unit) {
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
+                textoPesoCobro(p.pesoLibras, p.totalPagar)?.let {
+                    Text(it, style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.SemiBold, color = VerdeGuardar)
+                }
             }
             Spacer(Modifier.width(8.dp))
             EstadoBadge(estado)
@@ -251,22 +259,12 @@ fun ListaPedidos(
     seleccionado: Long?,
     onSeleccionar: (Pedido) -> Unit,
     onNuevo: () -> Unit,
+    onBuscar: (EstadoPedido?) -> Unit,
+    filtroGuardado: FiltroBusqueda,
     modifier: Modifier = Modifier
 ) {
-    var filtroEstado by rememberSaveable { mutableStateOf<String?>(null) }
-    var filtroEmpresa by rememberSaveable { mutableStateOf<String?>(null) }
-    var busqueda by rememberSaveable { mutableStateOf("") }
-
-    val conEstado = remember(pedidos) { pedidos.map { it to it.estado() } }
-    val filtrados = remember(conEstado, filtroEstado, filtroEmpresa, busqueda) {
-        val q = busqueda.trim()
-        conEstado.filter { (p, e) ->
-            (filtroEstado == null || e.name == filtroEstado) &&
-                (filtroEmpresa == null || p.empresaEnvio == filtroEmpresa) &&
-                (q.isEmpty() || p.codigo.contains(q, ignoreCase = true) || p.origen.contains(q, ignoreCase = true))
-        }.map { it.first }
-    }
-    val vencidos = conEstado.count { it.second == EstadoPedido.VENCIDO }
+    // La página principal muestra TODOS los pedidos; las búsquedas van en su propia pestaña.
+    val vencidos = remember(pedidos) { pedidos.count { it.estado() == EstadoPedido.VENCIDO } }
 
     LazyColumn(
         modifier = modifier,
@@ -285,14 +283,49 @@ fun ListaPedidos(
                 Text("REGISTRAR PEDIDO", fontWeight = FontWeight.Bold)
             }
         }
+        item {
+            // Barra que abre la pestaña de búsqueda
+            Surface(
+                onClick = { onBuscar(null) },
+                shape = RoundedCornerShape(14.dp),
+                color = MaterialTheme.colorScheme.surface,
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Row(Modifier.padding(horizontal = 14.dp, vertical = 14.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Icon(Icons.Default.Search, null, tint = MaterialTheme.colorScheme.primary)
+                    Spacer(Modifier.width(10.dp))
+                    Column(Modifier.weight(1f)) {
+                        Text("Buscar pedidos", fontWeight = FontWeight.SemiBold)
+                        Text(
+                            if (filtroGuardado.activo) "Búsqueda guardada · ${filtroGuardado.criterios} filtro(s) · toca para ver"
+                            else "Por cliente, fecha, empresa, peso o estado",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                    if (filtroGuardado.activo) {
+                        Surface(shape = CircleShape, color = MaterialTheme.colorScheme.primary) {
+                            Text(
+                                "${filtroGuardado.criterios}",
+                                color = Color.White,
+                                fontWeight = FontWeight.Bold,
+                                modifier = Modifier.padding(horizontal = 9.dp, vertical = 3.dp)
+                            )
+                        }
+                    }
+                }
+            }
+        }
+        item {
+            ResumenLibras(pedidos)
+        }
         if (vencidos > 0) {
             item {
                 Surface(
                     color = EstadoRojo,
                     shape = RoundedCornerShape(12.dp),
-                    modifier = Modifier.fillMaxWidth().clickable {
-                        filtroEstado = if (filtroEstado == EstadoPedido.VENCIDO.name) null else EstadoPedido.VENCIDO.name
-                    }
+                    modifier = Modifier.fillMaxWidth().clickable { onBuscar(EstadoPedido.VENCIDO) }
                 ) {
                     Row(Modifier.padding(14.dp), verticalAlignment = Alignment.CenterVertically) {
                         Icon(Icons.Default.Warning, null, tint = Color.White)
@@ -310,48 +343,14 @@ fun ListaPedidos(
             }
         }
         item {
-            OutlinedTextField(
-                value = busqueda,
-                onValueChange = { busqueda = it },
-                placeholder = { Text("Buscar por código u origen") },
-                leadingIcon = { Icon(Icons.Default.Search, null) },
-                singleLine = true,
-                shape = RoundedCornerShape(12.dp),
-                modifier = Modifier.fillMaxWidth()
-            )
-        }
-        item {
-          Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
             Text(
-                "Lista de Pedidos (${filtrados.size})",
+                "Lista de Pedidos (${pedidos.size})",
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.Bold,
                 color = MaterialTheme.colorScheme.primary
             )
-            Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                ChipFiltro("Todos (${conEstado.size})", filtroEstado == null, MaterialTheme.colorScheme.primary) {
-                    filtroEstado = null
-                }
-                EstadoPedido.entries.forEach { e ->
-                    val n = conEstado.count { it.second == e }
-                    ChipFiltro("${e.etiqueta} ($n)", filtroEstado == e.name, e.color(), e.colorTexto()) {
-                        filtroEstado = if (filtroEstado == e.name) null else e.name
-                    }
-                }
-            }
-            Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                ChipFiltro("Todas las empresas", filtroEmpresa == null, MaterialTheme.colorScheme.secondary) {
-                    filtroEmpresa = null
-                }
-                EMPRESAS_ENVIO.forEach { emp ->
-                    ChipFiltro(emp, filtroEmpresa == emp, MaterialTheme.colorScheme.secondary) {
-                        filtroEmpresa = if (filtroEmpresa == emp) null else emp
-                    }
-                }
-            }
-          }
         }
-        if (filtrados.isEmpty()) {
+        if (pedidos.isEmpty()) {
             item {
                 Column(
                     Modifier.fillMaxWidth().padding(vertical = 40.dp),
@@ -363,15 +362,62 @@ fun ListaPedidos(
                         modifier = Modifier.size(56.dp)
                     )
                     Spacer(Modifier.height(8.dp))
-                    Text(
-                        if (pedidos.isEmpty()) "Todavía no hay pedidos registrados" else "Ningún pedido coincide con los filtros",
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
+                    Text("Todavía no hay pedidos registrados", color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }
         }
-        items(filtrados, key = { it.id }) { p ->
+        items(pedidos, key = { it.id }) { p ->
             TarjetaPedido(p, seleccionado = p.id == seleccionado, onClick = { onSeleccionar(p) })
+        }
+    }
+}
+
+/** Libras y dólares a pagar del listado visible, y el detalle por cada marca/origen. */
+@Composable
+fun ResumenLibras(pedidos: List<Pedido>) {
+    if (pedidos.isEmpty()) return
+    val (total, porOrigen) = remember(pedidos) { resumenPorOrigen(pedidos) }
+    var abierto by rememberSaveable { mutableStateOf(false) }
+    Card(
+        onClick = { abierto = !abierto },
+        shape = RoundedCornerShape(14.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer),
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Column(Modifier.padding(14.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Column(Modifier.weight(1f)) {
+                    Text("⚖️ Peso total", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onPrimaryContainer)
+                    Text(Dolares.libras(total.libras), fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onPrimaryContainer)
+                }
+                Column(Modifier.weight(1f), horizontalAlignment = Alignment.End) {
+                    Text("💵 Dinero a pagar", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onPrimaryContainer)
+                    Text(Dolares.fmt(total.dolares), fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleMedium, color = VerdeGuardar)
+                }
+            }
+            if (total.sinPeso > 0) {
+                Text("${total.sinPeso} pedido(s) sin peso todavía", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.75f))
+            }
+            Text(
+                if (abierto) "▲ Ocultar detalle por marca" else "▼ Ver libras por marca / origen (${porOrigen.size})",
+                style = MaterialTheme.typography.labelMedium,
+                fontWeight = FontWeight.SemiBold,
+                color = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.padding(top = 6.dp)
+            )
+            if (abierto) {
+                Spacer(Modifier.height(6.dp))
+                porOrigen.forEach { r ->
+                    Row(Modifier.fillMaxWidth().padding(vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Column(Modifier.weight(1f)) {
+                            Text(r.origen, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onPrimaryContainer)
+                            Text("${r.pedidos} pedido(s)", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.7f))
+                        }
+                        Text(Dolares.libras(r.libras), modifier = Modifier.padding(end = 12.dp), color = MaterialTheme.colorScheme.onPrimaryContainer)
+                        Text(Dolares.fmt(r.dolares), fontWeight = FontWeight.Bold, color = VerdeGuardar)
+                    }
+                }
+            }
         }
     }
 }

@@ -20,6 +20,7 @@ object Notificaciones {
     const val CANAL_ATRASO = "alertas_atraso"
     const val CANAL_RECORDATORIO = "recordatorio_diario"
     const val CANAL_TRAKER = "traker_cambios"
+    const val CANAL_NOTAS = "recordatorios_notas"
     private const val ID_RECORDATORIO = 1
 
     fun crearCanales(context: Context) {
@@ -32,6 +33,12 @@ object Notificaciones {
         nm.createNotificationChannel(
             NotificationChannel(CANAL_RECORDATORIO, "Recordatorio diario", NotificationManager.IMPORTANCE_DEFAULT).apply {
                 description = "Pregunta diaria: ¿Se registró mercadería hoy?"
+            }
+        )
+        nm.createNotificationChannel(
+            NotificationChannel(CANAL_NOTAS, "Recordatorios de notas", NotificationManager.IMPORTANCE_HIGH).apply {
+                description = "Avisos de la libreta a la fecha y hora que elegiste"
+                enableVibration(true)
             }
         )
         nm.createNotificationChannel(
@@ -126,5 +133,24 @@ object Notificaciones {
             .setAutoCancel(true)
             .build()
         NotificationManagerCompat.from(context).notify(ID_RECORDATORIO, n)
+    }
+
+    /** Aviso de una nota de la libreta: título = la nota, con sonido y vibración. */
+    @SuppressLint("MissingPermission")
+    fun recordatorioNota(context: Context, id: Int, texto: String, detalle: String) {
+        if (!puedeNotificar(context)) return
+        val n = NotificationCompat.Builder(context, CANAL_NOTAS)
+            .setSmallIcon(R.drawable.ic_notificacion)
+            .setColor(0xFF16A6B6.toInt())
+            .setContentTitle("⏰ " + texto.lineSequence().first().take(60))
+            .setContentText(detalle)
+            .setStyle(NotificationCompat.BigTextStyle().bigText("$texto\n\n$detalle"))
+            .setPriority(NotificationCompat.PRIORITY_HIGH)
+            .setCategory(NotificationCompat.CATEGORY_REMINDER)
+            .setDefaults(NotificationCompat.DEFAULT_ALL)
+            .setContentIntent(abrirApp(context))
+            .setAutoCancel(true)
+            .build()
+        NotificationManagerCompat.from(context).notify(id, n)
     }
 }

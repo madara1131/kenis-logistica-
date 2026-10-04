@@ -79,3 +79,27 @@ Notificaciones automáticas: al importar (qué cambió respecto a lo anterior) y
 pasa el 90 % o supera su presupuesto, o una sección queda con saldo negativo.
 
 Los datos del Traker van en una base aparte (`traker.db`): los pedidos no se tocan.
+
+## Listas renovadas (v1.4)
+
+En TRAKER → **Listas** ahora hay pestañas de colores que se deslizan: **Resumen · Deudas · Gastos extras · Ahorros · Diezmo · Libreta**.
+
+- **Resumen:** estado financiero, tarjetas por tipo, alertas, gráfico de cómo se reparte el dinero y próximos recordatorios.
+- **Deudas:** lo pagado y lo pendiente de cada deuda, con botón **Abonar**, avance de pagos y límite de deuda.
+- **Gastos extras:** fecha de cada gasto, gráfico por mes y límite con aviso al 90 % y al superarlo.
+- **Ahorros:** meta de ahorro con barra, crecimiento acumulado y ahorro por mes.
+- **Libreta:** hojas rayadas, páginas, escritura rápida (con #etiquetas), recordatorios con hora, colores y notas fijadas 📌.
+- En todas las listas: arrastra ⋮⋮ para ordenar, toca para editar y desliza ← para eliminar.
+
+## Peso y cobro por libra (v1.5)
+
+- En **Registrar pedido** (Aérea y Marítima) se quitó "Marca de ingreso" y se agregó **Peso total (lb)** y **Pago por libra (US$)**.
+- Tarifas: **Aérea US$ 5.50/lb · Marítima US$ 2.00/lb** (se pueden cambiar en el campo si la tarifa cambia).
+- "Dinero a pagar" se calcula en vivo: peso × tarifa.
+- El peso se puede agregar o corregir después desde el detalle del pedido (cuando llegue a Miami).
+- Arriba de la lista: total de libras y dólares, y el detalle **por cada marca / origen**. También en Reportes, Excel y PDF.
+- BOFO ahora se llama **GOFO** (los pedidos viejos se actualizan solos).
+- v1.6: nueva empresa de envío **Speedx** (formulario, filtros, reportes y cobro por libra).
+- v1.7: pestaña **Buscar pedidos** (🔍) aparte de la lista principal: por cliente, fecha, empresa, peso y estado; orden por fecha, peso, costo o estado; acciones rápidas (Miami, ingreso, peso, cliente, eliminar). La búsqueda queda guardada. Nuevo campo opcional **Cliente**.
+- v1.8: revisión completa del código: se quitó código sin uso, se unificaron componentes repetidos y se limpiaron imports.
+- v1.9: notas con **fecha y hora** (también en la escritura rápida con el botón ⏰); el aviso llega a la hora exacta con sonido y vibración.

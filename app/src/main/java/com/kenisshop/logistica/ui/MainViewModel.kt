@@ -8,7 +8,11 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.kenisshop.logistica.data.AppDatabase
 import com.kenisshop.logistica.data.AuthRepository
+import com.kenisshop.logistica.data.EstadoPedido
+import com.kenisshop.logistica.data.FiltroBusqueda
+import com.kenisshop.logistica.data.OrdenBusqueda
 import com.kenisshop.logistica.data.Pedido
+import com.kenisshop.logistica.data.TipoMercaderia
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -53,7 +57,70 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         viewModelScope.launch { dao.marcarMiami(id, fecha) }
     }
 
+    fun actualizarPeso(id: Long, peso: Double?, tarifa: Double?) {
+        viewModelScope.launch { dao.actualizarPeso(id, peso, tarifa) }
+    }
+
     fun registrarIngreso(id: Long, fecha: Long) {
         viewModelScope.launch { dao.actualizarIngreso(id, fecha) }
+    }
+
+    // ------------------------------------------------ Búsqueda (pestaña independiente)
+
+    private val prefsBusqueda = app.getSharedPreferences("busqueda_pedidos", android.content.Context.MODE_PRIVATE)
+
+    /** La búsqueda se guarda: al volver a la pestaña se ven los mismos resultados. */
+    var filtro by mutableStateOf(leerFiltro())
+        private set
+
+    fun cambiarFiltro(nuevo: FiltroBusqueda) {
+        filtro = nuevo
+        prefsBusqueda.edit().apply {
+            putString("texto", nuevo.texto)
+            putString("tipo", nuevo.tipo?.name)
+            if (nuevo.desde != null) putLong("desde", nuevo.desde) else remove("desde")
+            if (nuevo.hasta != null) putLong("hasta", nuevo.hasta) else remove("hasta")
+            putString("empresa", nuevo.empresa)
+            putString("estado", nuevo.estado?.name)
+            putString("pesoMin", nuevo.pesoMin?.toString())
+            putString("pesoMax", nuevo.pesoMax?.toString())
+            putBoolean("sinPeso", nuevo.soloSinPeso)
+            putString("orden", nuevo.orden.name)
+            putBoolean("desc", nuevo.descendente)
+        }.apply()
+    }
+
+    private fun leerFiltro(): FiltroBusqueda = try {
+        val p = prefsBusqueda
+        FiltroBusqueda(
+            texto = p.getString("texto", "") ?: "",
+            tipo = p.getString("tipo", null)?.let { TipoMercaderia.valueOf(it) },
+            desde = if (p.contains("desde")) p.getLong("desde", 0) else null,
+            hasta = if (p.contains("hasta")) p.getLong("hasta", 0) else null,
+            empresa = p.getString("empresa", null),
+            estado = p.getString("estado", null)?.let { EstadoPedido.valueOf(it) },
+            pesoMin = p.getString("pesoMin", null)?.toDoubleOrNull(),
+            pesoMax = p.getString("pesoMax", null)?.toDoubleOrNull(),
+            soloSinPeso = p.getBoolean("sinPeso", false),
+            orden = p.getString("orden", null)?.let { OrdenBusqueda.valueOf(it) } ?: OrdenBusqueda.FECHA,
+            descendente = p.getBoolean("desc", true)
+        )
+    } catch (e: Exception) {
+        FiltroBusqueda()
+    }
+
+    // ------------------------------------------------ Acciones rápidas
+
+    fun actualizarCliente(id: Long, cliente: String?) {
+        viewModelScope.launch { dao.actualizarCliente(id, cliente?.trim()?.ifEmpty { null }) }
+    }
+
+    /** Elimina el pedido y su foto. */
+    fun eliminarPedido(p: Pedido) {
+        viewModelScope.launch {
+            dao.borrar(p)
+            p.fotoPath?.let { runCatching { java.io.File(it).delete() } }
+            androidx.core.app.NotificationManagerCompat.from(getApplication<Application>()).cancel(1000 + p.id.toInt())
+        }
     }
 }
