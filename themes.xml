@@ -1,0 +1,7 @@
+<resources>
+    <style name="Theme.Kenis" parent="android:Theme.Material.Light.NoActionBar">
+        <item name="android:statusBarColor">@color/azul_oscuro</item>
+        <item name="android:navigationBarColor">@color/azul_oscuro</item>
+        <item name="android:windowBackground">@color/fondo</item>
+    </style>
+</resources>
