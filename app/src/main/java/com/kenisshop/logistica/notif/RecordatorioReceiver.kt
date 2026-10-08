@@ -16,6 +16,8 @@ class RecordatorioReceiver : BroadcastReceiver() {
             try {
                 val sinIngreso = AppDatabase.get(context).pedidoDao().sinIngreso()
                 Notificaciones.recordatorioDiario(context, sinIngreso)
+                // La alarma diaria también revisa las temporadas (respaldo de WorkManager)
+                runCatching { RevisorTemporadas.revisar(context) }
             } finally {
                 resultado.finish()
             }

@@ -237,7 +237,8 @@ fun TarjetaSeccion(
     onEditarCategoria: (GastoCategoria) -> Unit,
     onBorrarCategoria: (GastoCategoria) -> Unit,
     onAgregar: () -> Unit,
-    onEditarCapital: () -> Unit
+    onEditarCapital: () -> Unit,
+    onCopiar: (() -> Unit)? = null
 ) {
     val plan = categorias.sumOf { it.plan }
     val real = categorias.sumOf { it.real }
@@ -290,6 +291,26 @@ fun TarjetaSeccion(
                 categorias.forEach { c ->
                     key(c.id) {
                         FilaCategoria(c, onClick = { onEditarCategoria(c) }, onBorrar = { onBorrarCategoria(c) })
+                    }
+                }
+                if (categorias.isEmpty()) {
+                    Text(
+                        "Todavía no hay categorías en este mes",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                    )
+                }
+                if (onCopiar != null) {
+                    Button(
+                        onClick = onCopiar,
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(12.dp),
+                        colors = ButtonDefaults.buttonColors(containerColor = VerdeGuardar, contentColor = Color.White)
+                    ) {
+                        Icon(Icons.Default.Add, null, Modifier.size(18.dp))
+                        Spacer(Modifier.width(6.dp))
+                        Text("Copiar categorías de otro mes")
                     }
                 }
                 TextButton(onClick = onAgregar) {

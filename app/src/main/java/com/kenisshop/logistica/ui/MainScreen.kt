@@ -22,6 +22,7 @@ import androidx.compose.material.icons.filled.DirectionsBoat
 import androidx.compose.material.icons.filled.Flight
 import androidx.compose.material.icons.filled.Insights
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.Today
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -52,12 +53,14 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.kenisshop.logistica.R
 import com.kenisshop.logistica.data.EstadoPedido
 import com.kenisshop.logistica.data.FiltroBusqueda
 import com.kenisshop.logistica.data.TipoMercaderia
 import com.kenisshop.logistica.ui.theme.colorCabecera
+import com.kenisshop.logistica.ui.midia.MiDiaScreen
 import com.kenisshop.logistica.ui.traker.TrakerScreen
 
 private const val PANEL_NINGUNO = -1L
@@ -92,7 +95,7 @@ fun MainScreen(vm: MainViewModel) {
         return
     }
 
-    BackHandler(enabled = tab != 2 && !esTablet && panel != PANEL_NINGUNO) { panel = PANEL_NINGUNO }
+    BackHandler(enabled = tab < 2 && !esTablet && panel != PANEL_NINGUNO) { panel = PANEL_NINGUNO }
 
     Scaffold(
         topBar = {
@@ -117,7 +120,7 @@ fun MainScreen(vm: MainViewModel) {
                         }
                     },
                     actions = {
-                        if (tab != 2) {
+                        if (tab < 2) {
                             IconButton(onClick = { abrirBusqueda(null) }) {
                                 Icon(Icons.Default.Search, "Buscar pedidos")
                             }
@@ -149,14 +152,14 @@ fun MainScreen(vm: MainViewModel) {
                         }
                     }
                 ) {
-                    val etiquetas = if (esTablet) listOf("MERCADERÍA AÉREA", "MERCADERÍA MARÍTIMA", "TRAKER")
-                    else listOf("AÉREA", "MARÍTIMA", "TRAKER")
-                    val iconos = listOf(Icons.Default.Flight, Icons.Default.DirectionsBoat, Icons.Default.Insights)
+                    val etiquetas = if (esTablet) listOf("MERCADERÍA AÉREA", "MERCADERÍA MARÍTIMA", "TRAKER", "MI DÍA")
+                    else listOf("AÉREA", "MARÍTIMA", "TRAKER", "MI DÍA")
+                    val iconos = listOf(Icons.Default.Flight, Icons.Default.DirectionsBoat, Icons.Default.Insights, Icons.Default.Today)
                     etiquetas.forEachIndexed { i, texto ->
                         Tab(
                             selected = tab == i,
                             onClick = { if (tab != i) { tab = i; panel = PANEL_NINGUNO } },
-                            text = { Text(texto, fontWeight = FontWeight.Bold, maxLines = 1) },
+                            text = { Text(texto, fontWeight = FontWeight.Bold, maxLines = 1, softWrap = false, fontSize = if (esTablet) 14.sp else 11.sp) },
                             icon = { Icon(iconos[i], null) },
                             unselectedContentColor = Color.White.copy(alpha = 0.65f)
                         )
@@ -173,6 +176,8 @@ fun MainScreen(vm: MainViewModel) {
         ) {
             if (tab == 2) {
                 TrakerScreen()
+            } else if (tab == 3) {
+                MiDiaScreen()
             } else if (esTablet) {
                 // Tablet: lista a la izquierda, detalle o formulario a la derecha
                 Row(Modifier.fillMaxSize()) {

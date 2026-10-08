@@ -23,6 +23,14 @@ object Programador {
             ExistingPeriodicWorkPolicy.KEEP,
             revision
         )
+        val temporadas = PeriodicWorkRequestBuilder<TemporadasWorker>(24, TimeUnit.HOURS)
+            .setInitialDelay(20, TimeUnit.MINUTES)
+            .build()
+        WorkManager.getInstance(context).enqueueUniquePeriodicWork(
+            "revisar_temporadas",
+            ExistingPeriodicWorkPolicy.KEEP,
+            temporadas
+        )
         programarRecordatorio(context)
     }
 

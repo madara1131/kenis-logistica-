@@ -11,7 +11,6 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
-import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -89,6 +88,7 @@ import com.kenisshop.logistica.data.traker.plan
 import com.kenisshop.logistica.data.traker.real
 import com.kenisshop.logistica.data.traker.ResumenTotales
 import com.kenisshop.logistica.data.traker.resumen
+import com.kenisshop.logistica.data.traker.mesesSin
 import com.kenisshop.logistica.ui.ChipFiltro
 import com.kenisshop.logistica.ui.theme.AzulKenis
 import com.kenisshop.logistica.ui.theme.EstadoRojo
@@ -298,7 +298,8 @@ private fun VistaMes(
                 onBorrar = { vm.borrarCategoria(it) },
                 onNueva = onNueva,
                 onCapital = onCapital,
-                onBorrarMes = { borrarMes = meses[pagina] }
+                onBorrarMes = { borrarMes = meses[pagina] },
+                onCompletar = { sec, todos -> vm.completarSeccion(meses[pagina], sec, todos) }
             )
         }
     }
@@ -324,12 +325,14 @@ private fun PaginaMes(
     onBorrar: (GastoCategoria) -> Unit,
     onNueva: (String, SeccionTraker) -> Unit,
     onCapital: (String, SeccionTraker) -> Unit,
-    onBorrarMes: () -> Unit
+    onBorrarMes: () -> Unit,
+    onCompletar: (SeccionTraker, Boolean) -> Unit
 ) {
     val esTablet = LocalConfiguration.current.screenWidthDp >= 600
     val cats = d.delMes(mes)
     val secciones = d.secciones(mes).ifEmpty { listOf(SeccionTraker.PERSONAL) }
-    val faltantes = SeccionTraker.entries.filter { it !in secciones }
+    // Las 3 secciones siempre se muestran, en el mismo orden que el resumen
+    val ordenSecciones = listOf(SeccionTraker.PERSONAL, SeccionTraker.NECESARIOS, SeccionTraker.KENISSHOP)
 
     val resumen: @Composable () -> Unit = {
         Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -363,6 +366,8 @@ private fun PaginaMes(
                 titulo = "👤 Gastos personales",
                 subtitulo = "Gastos propios",
                 r = d.resumen(mes, SeccionTraker.PERSONAL),
+                faltaEnMeses = d.mesesSin(SeccionTraker.PERSONAL).size,
+                onCompletar = { todos -> onCompletar(SeccionTraker.PERSONAL, todos) },
                 fondo = MaterialTheme.colorScheme.primaryContainer,
                 texto = MaterialTheme.colorScheme.onPrimaryContainer
             )
@@ -371,6 +376,8 @@ private fun PaginaMes(
                 titulo = "🧾 Gastos necesarios",
                 subtitulo = "Supermercado, suscripciones, tarjetas…",
                 r = d.resumen(mes, SeccionTraker.NECESARIOS),
+                faltaEnMeses = d.mesesSin(SeccionTraker.NECESARIOS).size,
+                onCompletar = { todos -> onCompletar(SeccionTraker.NECESARIOS, todos) },
                 fondo = Color(0xFFF2A12E).copy(alpha = 0.16f),
                 texto = MaterialTheme.colorScheme.onSurface
             )
@@ -379,6 +386,8 @@ private fun PaginaMes(
                 titulo = "🛍️ Kenisshop",
                 subtitulo = "Gastos del negocio",
                 r = d.resumen(mes, SeccionTraker.KENISSHOP),
+                faltaEnMeses = d.mesesSin(SeccionTraker.KENISSHOP).size,
+                onCompletar = { todos -> onCompletar(SeccionTraker.KENISSHOP, todos) },
                 fondo = RosaKenis.copy(alpha = 0.14f),
                 texto = MaterialTheme.colorScheme.onSurface
             )
@@ -413,28 +422,19 @@ private fun PaginaMes(
 
     val tarjetas: @Composable () -> Unit = {
         Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            secciones.forEach { s ->
+            ordenSecciones.forEach { s ->
                 key(s) {
+                    val deLaSeccion = cats.filter { it.seccion == s }
                     TarjetaSeccion(
                         seccion = s,
-                        categorias = cats.filter { it.seccion == s },
+                        categorias = deLaSeccion,
                         capital = d.capital(mes, s),
                         onEditarCategoria = onEditar,
                         onBorrarCategoria = onBorrar,
                         onAgregar = { onNueva(mes, s) },
-                        onEditarCapital = { onCapital(mes, s) }
+                        onEditarCapital = { onCapital(mes, s) },
+                        onCopiar = if (deLaSeccion.isEmpty()) ({ onCompletar(s, false) }) else null
                     )
-                }
-            }
-            if (faltantes.isNotEmpty()) {
-                FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    faltantes.forEach { s ->
-                        AssistChip(
-                            onClick = { onNueva(mes, s) },
-                            label = { Text("Agregar ${s.etiqueta}") },
-                            leadingIcon = { Icon(Icons.Default.Add, null, Modifier.size(18.dp)) }
-                        )
-                    }
                 }
             }
         }
@@ -785,6 +785,8 @@ private fun ResumenGrupo(
     titulo: String,
     subtitulo: String,
     r: ResumenTotales,
+    faltaEnMeses: Int,
+    onCompletar: (Boolean) -> Unit,
     fondo: Color,
     texto: Color
 ) {
@@ -835,6 +837,25 @@ private fun ResumenGrupo(
                 style = MaterialTheme.typography.labelSmall,
                 color = texto
             )
+            if (r.cantidad == 0) {
+                // Sección vacía este mes: se llena con un toque copiando las categorías de otro mes
+                Spacer(Modifier.height(10.dp))
+                Button(
+                    onClick = { onCompletar(false) },
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(12.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = VerdeGuardar, contentColor = Color.White)
+                ) {
+                    Icon(Icons.Default.Add, null, Modifier.size(18.dp))
+                    Spacer(Modifier.width(6.dp))
+                    Text("Agregar categorías a este mes")
+                }
+                if (faltaEnMeses > 1) {
+                    TextButton(onClick = { onCompletar(true) }, modifier = Modifier.fillMaxWidth()) {
+                        Text("Agregar a todos los meses que no tienen ($faltaEnMeses)", color = texto)
+                    }
+                }
+            }
             if (excedidos > 0) {
                 Spacer(Modifier.height(10.dp))
                 Row(

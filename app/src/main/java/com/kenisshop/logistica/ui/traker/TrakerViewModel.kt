@@ -12,6 +12,9 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.kenisshop.logistica.data.traker.AjustesTraker
 import com.kenisshop.logistica.data.traker.CapitalMes
+import com.kenisshop.logistica.data.traker.mesesSin
+import com.kenisshop.logistica.data.traker.plantillaSeccion
+import com.kenisshop.logistica.data.traker.categoriasPorDefecto
 import com.kenisshop.logistica.data.traker.TipoLista
 import com.kenisshop.logistica.data.traker.TrakerPrefs
 import com.kenisshop.logistica.data.traker.DatosTraker
@@ -198,11 +201,8 @@ class TrakerViewModel(app: Application) : AndroidViewModel(app) {
             val ultimo = d.meses.lastOrNull()
             var nuevo = if (ultimo == null) Meses.actual() else Meses.siguiente(ultimo)
             while (nuevo in d.meses) nuevo = Meses.siguiente(nuevo)
-            val base = if (ultimo != null && d.delMes(ultimo).isNotEmpty()) {
-                d.delMes(ultimo).map { it.copy(id = 0, mes = nuevo, gastoReal = null, actualizado = System.currentTimeMillis()) }
-            } else {
-                categoriasPorDefecto(nuevo)
-            }
+            // Cada sección se copia del último mes que la tenga (así no se pierden los necesarios)
+            val base = SeccionTraker.entries.flatMap { plantillaSeccion(d.categorias, nuevo, it) }
             try {
                 dao.insertarCategorias(base)
                 mesEnfocado = nuevo
@@ -216,7 +216,7 @@ class TrakerViewModel(app: Application) : AndroidViewModel(app) {
     fun empezarDesdeCero() {
         viewModelScope.launch {
             val mes = Meses.actual()
-            dao.insertarCategorias(categoriasPorDefecto(mes))
+            dao.insertarCategorias(SeccionTraker.entries.flatMap { categoriasPorDefecto(mes, it) })
             mesEnfocado = mes
         }
     }
@@ -228,17 +228,22 @@ class TrakerViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
-    private fun categoriasPorDefecto(mes: String): List<GastoCategoria> {
-        fun c(s: SeccionTraker, n: String) = GastoCategoria(mes = mes, seccion = s, categoria = n, presupuesto = null, gastoReal = null)
-        return listOf(
-            c(SeccionTraker.PERSONAL, "🏠 Casa"), c(SeccionTraker.PERSONAL, "🚗 Vehículo"),
-            c(SeccionTraker.PERSONAL, "🎉 Diversión"), c(SeccionTraker.PERSONAL, "🔧 Extras"),
-            c(SeccionTraker.KENISSHOP, "🛍️ Negocio"), c(SeccionTraker.KENISSHOP, "📱 Facebook Ads"),
-            c(SeccionTraker.KENISSHOP, "📢 Publicidad"), c(SeccionTraker.KENISSHOP, "🔧 Extras"),
-            c(SeccionTraker.KENISSHOP, "📲 Recargas"),
-            c(SeccionTraker.NECESARIOS, "🛒 Supermercado"), c(SeccionTraker.NECESARIOS, "📺 Suscripciones"),
-            c(SeccionTraker.NECESARIOS, "💳 Pagos Tarjetas"), c(SeccionTraker.NECESARIOS, "🔧 Gym")
-        )
+    /** Agrega las categorías de una sección a un mes (o a todos los meses que no la tienen). */
+    fun completarSeccion(mes: String, seccion: SeccionTraker, todosLosMeses: Boolean) {
+        viewModelScope.launch {
+            val d = foto()
+            val destino = if (todosLosMeses) d.mesesSin(seccion) else listOf(mes).filter { it in d.mesesSin(seccion) || it !in d.meses }
+            if (destino.isEmpty()) { aviso("${seccion.etiqueta} ya está en ese mes"); return@launch }
+            try {
+                dao.insertarCategorias(destino.flatMap { plantillaSeccion(d.categorias, it, seccion) })
+                aviso(
+                    if (destino.size == 1) "${seccion.etiqueta} agregados a ${Meses.etiqueta(destino[0])} ✔"
+                    else "${seccion.etiqueta} agregados a ${destino.size} meses ✔"
+                )
+            } catch (e: Exception) {
+                aviso("No se pudo agregar")
+            }
+        }
     }
 
     // ------------------------------------------------------------ Listas, finanzas y libreta

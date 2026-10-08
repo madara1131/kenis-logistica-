@@ -148,3 +148,34 @@ fun DatosTraker.resumen(mes: String, seccion: SeccionTraker): ResumenTotales {
         cantidad = c.size
     )
 }
+
+// ------------------------------------------------ Plantillas de categorías por sección
+
+/** Categorías iniciales de cada sección cuando no hay ningún mes del cual copiar. */
+fun categoriasPorDefecto(mes: String, seccion: SeccionTraker): List<GastoCategoria> {
+    val nombres = when (seccion) {
+        SeccionTraker.PERSONAL -> listOf("🏠 Casa", "🚗 Vehículo", "🎉 Diversión", "🔧 Extras")
+        SeccionTraker.KENISSHOP -> listOf("🛍️ Negocio", "📱 Facebook Ads", "📢 Publicidad", "🔧 Extras", "📲 Recargas")
+        SeccionTraker.NECESARIOS -> listOf("🛒 Supermercado", "📺 Suscripciones", "💳 Pagos Tarjetas", "🔧 Gym")
+    }
+    return nombres.map { GastoCategoria(mes = mes, seccion = seccion, categoria = it, presupuesto = null, gastoReal = null) }
+}
+
+/**
+ * Categorías de [seccion] para [mes], copiadas del mes más cercano que SÍ tenga esa sección
+ * (primero el último anterior, si no el más próximo después). Copia los presupuestos y deja el gasto en cero.
+ * Si ningún mes la tiene, usa las categorías por defecto.
+ */
+fun plantillaSeccion(categorias: List<GastoCategoria>, mes: String, seccion: SeccionTraker): List<GastoCategoria> {
+    val conSeccion = categorias.filter { it.seccion == seccion && it.mes != mes }.map { it.mes }.distinct().sorted()
+    val origen = conSeccion.lastOrNull { it < mes } ?: conSeccion.firstOrNull { it > mes }
+        ?: return categoriasPorDefecto(mes, seccion)
+    val ahora = System.currentTimeMillis()
+    return categorias.filter { it.mes == origen && it.seccion == seccion }
+        .sortedBy { it.id }
+        .map { it.copy(id = 0, mes = mes, gastoReal = null, actualizado = ahora) }
+}
+
+/** Meses que no tienen ninguna categoría de [seccion]. */
+fun DatosTraker.mesesSin(seccion: SeccionTraker): List<String> =
+    meses.filter { m -> categorias.none { it.mes == m && it.seccion == seccion } }

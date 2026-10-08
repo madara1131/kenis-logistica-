@@ -21,6 +21,7 @@ object Notificaciones {
     const val CANAL_RECORDATORIO = "recordatorio_diario"
     const val CANAL_TRAKER = "traker_cambios"
     const val CANAL_NOTAS = "recordatorios_notas"
+    const val CANAL_MI_DIA = "mi_dia"
     private const val ID_RECORDATORIO = 1
 
     fun crearCanales(context: Context) {
@@ -39,6 +40,11 @@ object Notificaciones {
             NotificationChannel(CANAL_NOTAS, "Recordatorios de notas", NotificationManager.IMPORTANCE_HIGH).apply {
                 description = "Avisos de la libreta a la fecha y hora que elegiste"
                 enableVibration(true)
+            }
+        )
+        nm.createNotificationChannel(
+            NotificationChannel(CANAL_MI_DIA, "Mi Día: temporadas y premios", NotificationManager.IMPORTANCE_HIGH).apply {
+                description = "Temporadas que se acercan, fechas límite para pedir y premios desbloqueados"
             }
         )
         nm.createNotificationChannel(
@@ -148,6 +154,23 @@ object Notificaciones {
             .setPriority(NotificationCompat.PRIORITY_HIGH)
             .setCategory(NotificationCompat.CATEGORY_REMINDER)
             .setDefaults(NotificationCompat.DEFAULT_ALL)
+            .setContentIntent(abrirApp(context))
+            .setAutoCancel(true)
+            .build()
+        NotificationManagerCompat.from(context).notify(id, n)
+    }
+
+    /** Aviso de Mi Día (temporadas y premios). */
+    @SuppressLint("MissingPermission")
+    fun miDia(context: Context, id: Int, titulo: String, texto: String, urgente: Boolean = false) {
+        if (!puedeNotificar(context)) return
+        val n = NotificationCompat.Builder(context, CANAL_MI_DIA)
+            .setSmallIcon(R.drawable.ic_notificacion)
+            .setColor(if (urgente) 0xFFD93B30.toInt() else 0xFF1E4E9A.toInt())
+            .setContentTitle(titulo)
+            .setContentText(texto)
+            .setStyle(NotificationCompat.BigTextStyle().bigText(texto))
+            .setPriority(if (urgente) NotificationCompat.PRIORITY_HIGH else NotificationCompat.PRIORITY_DEFAULT)
             .setContentIntent(abrirApp(context))
             .setAutoCancel(true)
             .build()
